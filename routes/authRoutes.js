@@ -27,3 +27,5 @@ router.get('/adminlastLogin',auth, adminController.adminProfile);
 router.post("/Admin-passwordChange", auth, adminController.AdminChangePassword);
 
 module.exports = router;
+
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5Y2JjOGNjN2IwMThmOGFlNzhjMGNhNSIsImlhdCI6MTc3NDk2MzExOSwiZXhwIjoxNzc1MDQ5NTE5fQ.ghhAg7-BDPBEo3gKsyXnRIUItbDk-JEENmrRjKPcSPU

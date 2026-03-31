@@ -14,7 +14,7 @@ const MarkingSetting = require('../models/markingSetting');
 
 exports.createAssigned = async (req, res) => {
   try {
-    const {classId, learning,learning2,learning3,learning4} = req.body;
+    const {classId, learning, learning2, learning3, learning4, learning5} = req.body;
     const createdBy = req.user.id; 
 
     if (!classId || !learning) {
@@ -26,6 +26,7 @@ exports.createAssigned = async (req, res) => {
       learning2,
       learning3,
       learning4,
+      learning5,
       createdBy
     });
     const savedAssigned = await assigned.save();
@@ -47,6 +48,7 @@ exports.getAssignedList = async (req, res) => {
       .populate('learning2')
       .populate('learning3')
       .populate('learning4')
+      .populate('learning5')
       .lean(); 
     for (let item of assignedList) {
       let classInfo = await School.findById(item.classId).lean();
@@ -279,6 +281,7 @@ exports.getAssignedListUser = async (req, res) => {
       .populate("learning2", "_id name")
       .populate("learning3", "_id name")
       .populate("learning4", "_id name")
+      .populate("learning5", "_id name")
       .lean();
 
     for (const item of assignedList) {
@@ -304,7 +307,7 @@ exports.getAssignedListUser = async (req, res) => {
         return 0;
       };
 
-      ["learning", "learning2", "learning3", "learning4"].forEach(field => {
+      ["learning", "learning2", "learning3", "learning4", "learning5"].forEach(field => {
         if (!item[field] || Object.keys(item[field]).length === 0) {
           item[field] = null;
         }
@@ -314,6 +317,7 @@ exports.getAssignedListUser = async (req, res) => {
       item.learning2Average = getAverage(item.learning2);
       item.learning3Average = getAverage(item.learning3);
       item.learning4Average = getAverage(item.learning4);
+      item.learning5Average = getAverage(item.learning5);
     }
 
     return res.status(200).json({
@@ -856,6 +860,7 @@ exports.assignBonusPoint = async (req, res) => {
       .populate('learning2')
       .populate('learning3')
       .populate('learning4')
+      .populate('learning5')
       .lean();
 
     for (let item of assignedList) {
