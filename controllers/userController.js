@@ -1,0 +1,3632 @@
+const crypto = require("crypto");
+const qs = require("querystring");
+const axios = require("axios");
+const cron = require("node-cron");
+const Notification = require("../models/notification");
+const User = require('../models/User');
+const TempUser = require('../models/tempuser');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const College = require('../models/college');
+const School = require('../models/school');
+const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
+const Admin1 = require('../models/admin1'); 
+const UserHistory = require('../models/UserHistory');
+const UserForAdmin = require("../models/userforAdmin");
+const ExamResult = require('../models/examResult');
+// const Schoolerexam = require('../models/Schoolerexam');
+const ExamUserStatus = require("../models/ExamUserStatus");
+const Location = require("../models/location");
+const CategoryTopUser = require("../models/CategoryTopUser");
+const userexamGroup = require("../models/userExamGroup");
+const Schoolercategory = require("../models/schoolershipcategory");
+const Schoolerexam = require("../models/Schoolerexam");
+const UserExamGroup = require("../models/userExamGroup");
+const LearningScore = require('../models/learningScore');
+const InstitutionPrice = require("../models/InstitutionPrice");
+const Admin = require("../models/admin1");
+const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
+const Tempuser = require('../models/tempuser');
+const SessionCard = require('../models/sessioncard');
+
+const s3 = require("../config/s3");
+const fs = require('fs');
+const path = require('path');
+
+const Razorpay = require("razorpay");
+const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
+
+const moment = require('moment-timezone');
+const Payment = require("../models/payment");
+
+
+// exports.signup = async (req, res) => {
+//   try {
+//     const {
+//       firstName,
+//       middleName,
+//       lastName,
+//       mobileNumber,
+//       email,
+//       password,
+//       confirmPassword
+//     } = req.body;
+
+//     if (!firstName) return res.status(400).json({ message: 'First Name can’t remain empty.' });
+//     if (!lastName) return res.status(400).json({ message: 'Last Name can’t remain empty.' });
+//     if (!email) return res.status(400).json({ message: 'Email address can’t remain empty.' });
+//     if (!password) return res.status(400).json({ message: 'Create Password can’t remain empty.' });
+//     if (!confirmPassword) return res.status(400).json({ message: 'Confirm Password can’t remain empty.' });
+
+//     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//     if (!emailRegex.test(email)) {
+//       return res.status(400).json({ message: 'Please enter a valid email address.' });
+//     }
+
+//     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+//     if (!passwordRegex.test(password)) {
+//       return res.status(400).json({
+//         message: 'Password must contain at least 8 characters including uppercase, lowercase, and number.'
+//       });
+//     }
+
+//     if (password !== confirmPassword) {
+//       return res.status(400).json({ message: 'Passwords do not match.' });
+//     }
+
+//     const existingUser = await User.findOne({ email });
+//     if (existingUser) {
+//       return res.status(409).json({
+//         message: "User already registered. Please login."
+//       });
+//     }
+//     const hashedPassword = await bcrypt.hash(password, 10);
+//     const allCategories = await Schoolercategory
+//       .find()
+//       .select("_id name examType")
+//       .sort({ createdAt: 1 })
+//       .lean();
+
+//     let userDetails = [];
+//     allCategories.forEach((cat, catIndex) => {
+//       userDetails.push({
+//         category: {
+//           _id: cat._id,
+//           name: cat.name,
+//           examType: cat.examType || []
+//         },
+//         examTypes: (cat.examType || []).map((et, etIndex) => ({
+//           _id: et._id,
+//           name: et.name,
+//           status: catIndex === 0 && etIndex === 0 ? "Eligible" : "NA",
+//           result: "NA",
+//           AttemptStatus: "NA"
+//         }))
+//       });
+//     });
+
+    
+//     const tempUser = await Tempuser.findOneAndUpdate(
+//       { email },
+//       {
+//         firstName,
+//         middleName,
+//         lastName,
+//         mobileNumber,
+//         password: hashedPassword,
+//         userDetails,
+//         status: "no",
+//         VerifyEmail: "No"
+//       },
+//       {
+//         new: true,
+//         upsert: true,
+//         setDefaultsOnInsert: true
+//       }
+//     );
+
+//     res.status(201).json({
+//       message: 'Now verify Your Email.'
+//     });
+
+//   } catch (error) {
+//     console.error('Signup error:', error);
+//     res.status(500).json({
+//       message: 'Server error during signup.',
+//       error: error.message
+//     });
+//   }
+// };
+
+
+exports.signup = async (req, res) => {
+  try {
+    const {
+      firstName,
+      middleName,
+      lastName,
+      mobileNumber,
+      email,
+      password,
+      confirmPassword
+    } = req.body;
+
+    if (!firstName) return res.status(400).json({ message: 'First Name can’t remain empty.' });
+    if (!lastName) return res.status(400).json({ message: 'Last Name can’t remain empty.' });
+    if (!email) return res.status(400).json({ message: 'Email address can’t remain empty.' });
+    if (!password) return res.status(400).json({ message: 'Create Password can’t remain empty.' });
+    if (!confirmPassword) return res.status(400).json({ message: 'Confirm Password can’t remain empty.' });
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address.' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      return res.status(400).json({
+        message: 'Password must contain at least 8 characters including uppercase, lowercase, and number.'
+      });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match.' });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({
+        message: "User already registered. Please login ."
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+  
+    const activeAdmin = await Admin1.findOne({
+      status: true
+    }).sort({ createdAt: -1 });
+
+    let userDetails = [];
+
+   
+    if (activeAdmin) {
+
+      const allCategories = await Schoolercategory
+        .find({ createdBy: activeAdmin._id }) 
+        .select("_id name examType")
+        .sort({ createdAt: 1 })
+        .lean();
+
+      allCategories.forEach((cat, catIndex) => {
+        userDetails.push({
+          category: {
+            _id: cat._id,
+            name: cat.name,
+            examType: cat.examType || []
+          },
+          examTypes: (cat.examType || []).map((et, etIndex) => ({
+            _id: et._id,
+            name: et.name,
+            status: catIndex === 0 && etIndex === 0 ? "Eligible" : "NA",
+            result: "NA",
+            AttemptStatus: "NA"
+          }))
+        });
+      });
+
+    } else {
+     
+      userDetails = []; 
+    }
+
+    const tempUser = await Tempuser.findOneAndUpdate(
+      { email },
+      {
+        firstName,
+        middleName,
+        lastName,
+        mobileNumber,
+        password: hashedPassword,
+        userDetails,
+        status: "no",
+        VerifyEmail: "No",
+         userBy: activeAdmin ? activeAdmin._id : null
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+
+    res.status(201).json({
+      message: activeAdmin
+        ? 'Now verify Your Email.'
+        : 'No active admin found. User created without category details. Verify your email.'
+    });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({
+      message: 'Server error during signup.',
+      error: error.message
+    });
+  }
+};
+
+
+// exports.Userlogin = async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+
+//     if (!email || !password)
+//       return res.status(400).json({ message: 'Email and password are required.' });
+
+//     const user = await User.findOne({ email });
+//     if (!user)
+//       return res.status(404).json({ message: 'User not found.' });
+
+//     const isMatch = await bcrypt.compare(password, user.password);
+//     if (!isMatch)
+//       return res.status(401).json({ message: 'Invalid Password.' });
+
+    
+//     const payload = { id: user._id };
+//     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+//     res.status(200).json({
+//       message: 'Login successful mukesh.',
+//       token
+//     });
+//   } catch (error) {
+//     console.error('Login error:', error);
+//     res.status(500).json({ message: 'Server error during login.' });
+//   }
+// };
+
+
+exports.Userlogin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password)
+      return res.status(400).json({ message: 'Email and password are required.' });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ message: 'User not found.' });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(401).json({ message: 'Invalid Password.' });
+    const isProfileComplete =
+      user.firstName &&
+      user.lastName &&
+      user.mobileNumber &&
+      user.email &&
+      user.studentType &&
+      user.className &&
+      user.stateId &&
+      user.cityId;
+
+    const payload = { id: user._id };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+    res.status(200).json({
+      message: 'Login successful .',
+      token,
+      isProfileComplete: !!isProfileComplete   
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error during login.' });
+  }
+};
+
+
+exports.completeProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    let {
+      countryId,
+      stateId,
+      cityId,
+      pincode,
+      studentType,
+      schoolName,
+      instituteName,
+      collegeName,
+      className
+    } = req.body;
+
+    if (pincode && !/^\d+$/.test(pincode)) {
+      return res.status(400).json({ message: 'Invalid Pincode' });
+    }
+
+    const updatedFields = {
+      pincode,
+      studentType,
+      schoolName,
+      instituteName,
+      collegeName,
+    };
+
+   
+    // const activeAdmin = await Admin.findOne({}).select("status").lean();
+    // if (activeAdmin) {
+    //   updatedFields.adminStatus = activeAdmin.status;
+    // }
+
+const activeAdmin = await Admin.findOne({ status: true }).select("status").lean();
+
+if (activeAdmin) {
+  updatedFields.adminStatus = true;
+}
+
+    if (mongoose.Types.ObjectId.isValid(countryId)) updatedFields.countryId = countryId;
+    if (mongoose.Types.ObjectId.isValid(stateId)) updatedFields.stateId = stateId;
+    if (mongoose.Types.ObjectId.isValid(cityId)) updatedFields.cityId = cityId;
+    if (mongoose.Types.ObjectId.isValid(className)) updatedFields.className = className;
+
+    if (req.files?.marksheet?.[0]) {
+      updatedFields.marksheet = req.files.marksheet[0].key;
+    }
+
+    let user = await User.findByIdAndUpdate(userId, updatedFields, { new: true })
+      .populate('countryId')
+      .populate('stateId')
+      .populate('cityId');
+
+    let classDetails = null;
+
+    if (mongoose.Types.ObjectId.isValid(className)) {
+      classDetails =
+        (await School.findById(className)) ||
+        (await College.findById(className));
+
+      
+      const activeAdmins = await Admin.find({ status: true }).select("_id").lean();
+      const adminIds = activeAdmins.map(a => a._id);
+
+     
+      const priceData = await InstitutionPrice.findOne({
+        classId: className,
+        updatedBy: { $in: adminIds }
+      }).lean();
+
+      if (priceData) {
+        user.price = priceData.price;
+      } else {
+        user.price = null;
+      }
+    }
+
+    const formattedUser = {
+      ...user._doc,
+      country: user.countryId?.name || '',
+      state: user.stateId?.name || '',
+      city: user.cityId?.name || '',
+      institutionName: schoolName || collegeName || instituteName || '',
+      institutionType: studentType || '',
+      classOrYear: classDetails?.name || '',
+      marksheet: user.marksheet || ""
+    };
+
+    res.status(200).json({
+      message: 'Profile updated. Redirecting to home page.',
+      user: formattedUser
+    });
+
+  } catch (error) {
+    console.error('Complete Profile Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// exports.getUserProfile = async (req, res) => {
+//   try {
+
+//     const userId = req.user.id;
+
+//     let user = await User.findById(userId)
+//       .populate('countryId', 'name')
+//       .populate('stateId', 'name')
+//       .populate('cityId', 'name');
+
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found.' });
+//     }
+
+//     let classId = user.className;
+//     let classDetails = null;
+//     let priceData = null;
+
+//     if (mongoose.Types.ObjectId.isValid(classId)) {
+
+//       classDetails =
+//         (await School.findById(classId)) ||
+//         (await College.findById(classId));
+
+//       const activeAdmins = await Admin.find({ status: true })
+//         .select("_id")
+//         .lean();
+
+//       const adminIds = activeAdmins.map(a => a._id);
+
+//       priceData = await InstitutionPrice.findOne({
+//         classId: classId,
+//         updatedBy: { $in: adminIds }
+//       })
+//       .sort({ createdAt: -1 })
+//       .populate({
+//         path: "updatedBy",
+//         select: "email session startDate endDate endTime name role"
+//       });
+
+//     }
+
+//     if (user.marksheet) {
+//       user.marksheet = s3.getSignedUrl("getObject", {
+//         Bucket: process.env.AWS_S3_BUCKET_NAME,
+//         Key: user.marksheet,
+//         Expires: 60 * 5,
+//       });
+//     }
+
+//     if (priceData && priceData.price != null) {
+
+//       const adminData = priceData.updatedBy;
+
+//       if (adminData) {
+
+//         const updates = {};
+
+//         // IMPORTANT CONDITION
+//         if (
+//           !user.updatedBy ||
+//           user.updatedBy.toString() === adminData._id.toString()
+//         ) {
+
+//           if (!user.updatedBy) {
+//             updates.updatedBy = adminData._id;
+//             user.updatedBy = adminData._id;
+//           }
+
+//           if (adminData.session && user.session !== adminData.session) {
+//             updates.session = adminData.session;
+//             user.session = adminData.session;
+//           }
+
+//           if (adminData.startDate && user.startDate !== adminData.startDate) {
+//             updates.startDate = adminData.startDate;
+//             user.startDate = adminData.startDate;
+//           }
+
+//           if (adminData.endDate && user.endDate !== adminData.endDate) {
+//             updates.endDate = adminData.endDate;
+//             user.endDate = adminData.endDate;
+//           }
+
+//           if (priceData.price && user.price !== priceData.price) {
+//             updates.price = priceData.price;
+//             user.price = priceData.price;
+//           }
+
+//           if (classDetails && user.classOrYear !== classDetails.name) {
+//             updates.classOrYear = classDetails.name;
+//             user.classOrYear = classDetails.name;
+//           }
+
+//           if (Object.keys(updates).length > 0) {
+//             await User.findByIdAndUpdate(userId, updates);
+//           }
+
+//         }
+
+//       }
+//     }
+
+//     let sessionStatus = false;
+
+//     if (user.adminStatus === true && user.paymentStatus === true) {
+//       sessionStatus = true;
+//     }
+
+//     if (user.sessionStatus !== sessionStatus) {
+//       await User.findByIdAndUpdate(userId, { sessionStatus: sessionStatus });
+//       user.sessionStatus = sessionStatus;
+//     }
+
+//     const formattedUser = {
+
+//       _id: user._id,
+//       VerifyEmail: user.VerifyEmail,
+//       firstName: user.firstName,
+//       middleName: user.middleName,
+//       lastName: user.lastName,
+//       mobileNumber: user.mobileNumber,
+//       email: user.email,
+//       pincode: user.pincode || "",
+//       status: user.status,
+//       level: user.level,
+
+//       session: user.session || "",
+
+//       countryId: user.countryId || null,
+//       stateId: user.stateId || null,
+//       cityId: user.cityId || null,
+
+//       className: classId || null,
+
+//       price: user.price || null,
+
+//       studentType: user.studentType || "",
+
+//       instituteName:
+//         user.schoolName ||
+//         user.collegeName ||
+//         user.instituteName ||
+//         "",
+
+//       classOrYear: user.classOrYear || "",
+
+//       startDate: user.startDate || "",
+//       endDate: user.endDate || "",
+
+//       adminStatus: user.adminStatus ?? "N/A",
+//       paymentStatus: user.paymentStatus ?? false,
+//       sessionStatus: user.sessionStatus ?? false
+
+//     };
+
+//     return res.status(200).json({
+//       message: "User profile fetched successfully.",
+//       user: formattedUser
+//     });
+
+//   } catch (error) {
+
+//     console.error('Get User Profile Error:', error);
+
+//     return res.status(500).json({
+//       message: error.message
+//     });
+
+//   }
+// };
+
+
+exports.getUserProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    let user = await User.findById(userId)
+      .populate('countryId', 'name')
+      .populate('stateId', 'name')
+      .populate('cityId', 'name');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    let classId = user.className;
+    let classDetails = null;
+    let priceData = null;
+
+    if (mongoose.Types.ObjectId.isValid(classId)) {
+
+      classDetails =
+        (await School.findById(classId)) ||
+        (await College.findById(classId));
+
+      const activeAdmins = await Admin.find({ status: true })
+        .select("_id")
+        .lean();
+
+      const adminIds = activeAdmins.map(a => a._id);
+
+      priceData = await InstitutionPrice.findOne({
+        classId: classId,
+        updatedBy: { $in: adminIds }
+      })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: "updatedBy",
+        select: "email session startDate endDate endTime name role"
+      });
+
+    }
+
+    
+    if (user.marksheet) {
+      user.marksheet = s3.getSignedUrl("getObject", {
+        Bucket: process.env.AWS_S3_BUCKET_NAME,
+        Key: user.marksheet,
+        Expires: 60 * 5,
+      });
+    }
+
+   
+    if (priceData && priceData.price != null) {
+
+      const adminData = priceData.updatedBy;
+
+      if (adminData) {
+
+        const updates = {};
+
+        if (
+          !user.updatedBy ||
+          user.updatedBy.toString() === adminData._id.toString()
+        ) {
+
+          if (!user.updatedBy) {
+            updates.updatedBy = adminData._id;
+            user.updatedBy = adminData._id;
+          }
+
+          if (adminData.session && user.session !== adminData.session) {
+            updates.session = adminData.session;
+            user.session = adminData.session;
+          }
+
+          if (adminData.startDate && user.startDate !== adminData.startDate) {
+            updates.startDate = adminData.startDate;
+            user.startDate = adminData.startDate;
+          }
+
+          if (adminData.endDate && user.endDate !== adminData.endDate) {
+            updates.endDate = adminData.endDate;
+            user.endDate = adminData.endDate;
+          }
+
+          if (priceData.price && user.price !== priceData.price) {
+            updates.price = priceData.price;
+            user.price = priceData.price;
+          }
+
+          if (classDetails && user.classOrYear !== classDetails.name) {
+            updates.classOrYear = classDetails.name;
+            user.classOrYear = classDetails.name;
+          }
+
+          if (Object.keys(updates).length > 0) {
+            await User.findByIdAndUpdate(userId, updates);
+          }
+
+        }
+
+      }
+    }
+
+   
+    let sessionStatus = false;
+
+    if (user.adminStatus === true && user.paymentStatus === true) {
+      sessionStatus = true;
+    }
+
+    if (user.sessionStatus !== sessionStatus) {
+      await User.findByIdAndUpdate(userId, { sessionStatus: sessionStatus });
+      user.sessionStatus = sessionStatus;
+    }
+
+    
+    const hideSessionFields =
+      user.paymentStatus === true &&
+      user.adminStatus === false &&
+      user.sessionStatus === false;
+
+    
+    const formattedUser = {
+
+      _id: user._id,
+      VerifyEmail: user.VerifyEmail,
+      firstName: user.firstName,
+      middleName: user.middleName,
+      lastName: user.lastName,
+      mobileNumber: user.mobileNumber,
+      email: user.email,
+      pincode: user.pincode || "",
+      status: user.status,
+      level: user.level,
+      ...(hideSessionFields ? {} : {
+        session: user.session || "",
+        classOrYear: user.classOrYear || "",
+        startDate: user.startDate || "",
+        endDate: user.endDate || "",
+        price: user.price || null,
+      }),
+
+      countryId: user.countryId || null,
+      stateId: user.stateId || null,
+      cityId: user.cityId || null,
+
+      className: classId || null,
+
+      // price: user.price || null,
+
+      studentType: user.studentType || "",
+
+      instituteName:
+        user.schoolName ||
+        user.collegeName ||
+        user.instituteName ||
+        "",
+
+      adminStatus: user.adminStatus ?? "N/A",
+      paymentStatus: user.paymentStatus ?? false,
+      sessionStatus: user.sessionStatus ?? false
+
+    };
+
+    return res.status(200).json({
+      message: "User profile fetched successfully.",
+      user: formattedUser
+    });
+
+  } catch (error) {
+
+    console.error('Get User Profile Error:', error);
+
+    return res.status(500).json({
+      message: error.message
+    });
+
+  }
+};
+
+exports.getUserMarksheetSecure = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId).select("marksheet");
+    if (!user || !user.marksheet) {
+      return res.status(404).json({ message: "Marksheet not found" });
+    }
+
+    const params = {
+      Bucket: process.env.AWS_S3_BUCKET_NAME,
+      Key: user.marksheet,
+    };
+
+    const stream = s3.getObject(params).createReadStream();
+
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+
+    stream.on("error", (err) => {
+      console.error(err);
+      return res.status(403).end();
+    });
+
+    stream.pipe(res);
+
+  } catch (error) {
+    console.error("Secure marksheet error:", error);
+    res.status(500).json({ message: "Unable to load marksheet" });
+  }
+};
+
+
+exports.sendResetOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); 
+    const expiry = new Date(Date.now() + 5 * 60 * 1000); 
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpires = expiry;
+    await user.save();
+     const templatePath = path.join(
+      __dirname,
+      "../public/forgot-password.html"
+    );
+
+    let htmlTemplate = fs.readFileSync(templatePath, "utf8");
+
+    htmlTemplate = htmlTemplate.replace("{{OTP}}", otp);
+
+   const transporter = nodemailer.createTransport({
+     service: 'gmail',
+     auth: {
+       user: 'noreply@shikshacart.com', 
+       pass: 'xyrx ryad ondf jaum' 
+     }
+   });
+
+    await transporter.sendMail({
+       from: `"ShikshaCart" <noreply@shikshacart.com>`,
+      to: email,
+      subject: 'Login OTP',
+      html: htmlTemplate, 
+    });
+
+    res.status(200).json({ message: 'OTP sent to email.' });
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+exports.loginWithOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (
+      !user.resetPasswordOTP ||
+      user.resetPasswordOTP !== otp ||
+      new Date() > user.resetPasswordExpires
+    ) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+ 
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '7d',
+    });
+    
+
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+    });
+  } catch (error) {
+    console.error('OTP Login Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+exports.resetPasswordAfterOTPLogin = async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: 'Token missing' });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'Both fields are required' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const user = await User.findByIdAndUpdate(userId, { password: hashedPassword }, { new: true });
+
+   
+   const transporter = nodemailer.createTransport({
+     service: 'gmail',
+     auth: {
+       user: 'noreply@shikshacart.com', 
+       pass: 'xyrx ryad ondf jaum' 
+     }
+   });
+
+    await transporter.sendMail({
+      from: 'noreply@shikshacart.com',
+      to: user.email,
+      subject: 'Password Changed Successfully',
+      text: `Hi ${user.firstName || 'User'},\n\nYour password has been successfully changed. You can now login with your new password.\n\nIf you did not perform this action, please contact support immediately.`,
+    });
+
+    res.status(200).json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.SendEmailverifyOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await Tempuser.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpires = expiry;
+    await user.save();
+    const templatePath = path.join(__dirname, "../public/verify-email.html");
+    let htmlTemplate = fs.readFileSync(templatePath, "utf8");
+    htmlTemplate = htmlTemplate.replace("{{OTP}}", otp);
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: "noreply@shikshacart.com",
+        pass: "xyrx ryad ondf jaum", 
+      },
+    });
+
+    
+    await transporter.sendMail({
+      from: "noreply@shikshacart.com",
+      to: email,
+      subject: "Email Verification OTP",
+      html: htmlTemplate, 
+    });
+
+    res.status(200).json({
+      message: "OTP sent to email for verification.",
+    });
+
+  } catch (error) {
+    console.error("Send OTP Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// exports.SendEmailverifyOTP = async (req, res) => {
+//   try {
+//     const { email } = req.body;
+
+//     const user = await Tempuser.findOne({ email });
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+   
+//     const otp = Math.floor(100000 + Math.random() * 900000).toString();
+//     const expiry = new Date(Date.now() + 5 * 60 * 1000);
+
+//     user.resetPasswordOTP = otp;
+//     user.resetPasswordExpires = expiry;
+//     await user.save();
+
+   
+//     const templatePath = path.join(__dirname, "../public/verify-email.html");
+//     let htmlTemplate = fs.readFileSync(templatePath, "utf8");
+//     htmlTemplate = htmlTemplate.replace("{{OTP}}", otp);
+
+   
+//     const sesClient = new SESClient({
+//       region: "ap-south-1",
+//       credentials: {
+//         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+//         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+//       },
+//     });
+
+    
+//     const params = {
+//       Source: "noreply@shikshacart.com", 
+//       Destination: {
+//         ToAddresses: [email],
+//       },
+//       Message: {
+//         Subject: {
+//           Data: "Email Verification OTP",
+//           Charset: "UTF-8",
+//         },
+//         Body: {
+//           Html: {
+//             Data: htmlTemplate,
+//             Charset: "UTF-8",
+//           },
+//         },
+//       },
+//     };
+
+//     await sesClient.send(new SendEmailCommand(params));
+
+//     res.status(200).json({
+//       message: "OTP sent to email for verification.",
+//     });
+//   } catch (error) {
+//     console.error("Send OTP Error:", error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+
+
+exports.testSESEmail = async (req, res) => {
+  try {
+    const ses = new SESClient({
+     region: "us-east-1",
+      credentials: {
+        accessKeyId: process.env.AWS_SES_ACCESS_KEY,
+        secretAccessKey: process.env.AWS_SES_SECRET_KEY,
+      },
+    });
+
+    const params = {
+      Source: "mukesh@developmentcart.com", 
+      Destination: {
+        ToAddresses: ["chandrakant@developmentcart.com"], 
+      },
+      Message: {
+        Subject: {
+          Data: "SES TEST OK",
+        },
+        Body: {
+          Text: {
+            Data: "Agar ye mail aaya hai to SES perfectly kaam kar raha hai ",
+          },
+        },
+      },
+    };
+
+    await ses.send(new SendEmailCommand(params));
+
+    return res.json({
+      success: true,
+      message: "SES test email sent successfully",
+    });
+  } catch (error) {
+    console.error("SES TEST ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+};
+
+
+// exports.EmailVerifyOtp = async (req, res) => {
+//   try {
+//     const { email, otp } = req.body;
+//     const user = await Tempuser.findOne({ email });
+//     if (!user) return res.status(404).json({ message: 'User not found' });
+//     if (
+//       !user.resetPasswordOTP ||
+//       user.resetPasswordOTP !== otp ||
+//       new Date() > user.resetPasswordExpires
+//     ) {
+//       return res.status(400).json({ message: 'Invalid or expired OTP' });
+//     }
+
+//     user.resetPasswordOTP = undefined;
+//     user.resetPasswordExpires = undefined;
+//     user.VerifyEmail = 'Yes'; 
+//     await user.save();
+
+//     res.status(200).json({
+//       message: 'Email Verified Successfully',
+//       VerifyEmail: user.VerifyEmail,
+//     });
+//   } catch (error) {
+//     console.error('Email Verify Error:', error);
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+exports.EmailVerifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    const tempUser = await Tempuser.findOne({ email });
+    if (!tempUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (
+      !tempUser.resetPasswordOTP ||
+      tempUser.resetPasswordOTP !== otp ||
+      new Date() > tempUser.resetPasswordExpires
+    ) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    const existingUser = await User.findOne({
+      $or: [{ email: tempUser.email }]
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: 'User already exists' });
+    }
+
+   
+    const newUser = new User({
+      firstName: tempUser.firstName,
+      middleName: tempUser.middleName,
+      lastName: tempUser.lastName,
+      mobileNumber: tempUser.mobileNumber,
+      email: tempUser.email,
+      password: tempUser.password, 
+      userDetails: tempUser.userDetails,
+      status: tempUser.status || "no",
+      VerifyEmail: "Yes",
+      userBy: tempUser.userBy
+    });
+
+    await newUser.save();
+
+    
+    await Notification.create({
+      userId: newUser._id,
+      type: "enrolled",
+      title: "Enroll now & start your journey!",
+      message: "Enroll now to learn new skills everyday"
+    });
+
+    
+    await Tempuser.findByIdAndDelete(tempUser._id);
+
+ 
+    const token = jwt.sign(
+      { id: newUser._id },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(200).json({
+      message: 'Email verified & account activated successfully',
+      token
+    });
+
+  } catch (error) {
+    console.error('Email Verify Error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
+exports.updateUser = async (req, res) => {
+  try { 
+    const userId = req.params.id;
+    const updates = req.body;
+    const updatedUser = await User.findByIdAndUpdate(userId, updates, { new: true });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    res.status(200).json({ message: 'User updated successfully.', user: updatedUser });
+
+  } catch (error) {
+    console.error('Update user error:', error);
+    res.status(500).json({ 
+      message: 'Server error during user update.', 
+      error: error.message 
+    });
+  }
+};
+
+
+
+
+// exports.updateProfile = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+
+//     const existingUser = await User.findById(userId);
+
+//     if (!existingUser) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     let {
+//       countryId,
+//       stateId,
+//       cityId,
+//       pincode,
+//       studentType,
+//       schoolName,
+//       instituteName,
+//       collegeName,
+//       className
+//     } = req.body;
+
+//     if (pincode && !/^\d+$/.test(pincode)) {
+//       return res.status(400).json({ message: "Invalid Pincode" });
+//     }
+
+//     const updatedFields = {
+//       pincode,
+//       studentType,
+//       schoolName,
+//       instituteName,
+//       collegeName
+//     };
+
+//     if (mongoose.Types.ObjectId.isValid(countryId)) updatedFields.countryId = countryId;
+//     if (mongoose.Types.ObjectId.isValid(stateId)) updatedFields.stateId = stateId;
+//     if (mongoose.Types.ObjectId.isValid(cityId)) updatedFields.cityId = cityId;
+//     if (mongoose.Types.ObjectId.isValid(className)) updatedFields.className = className;
+
+//     if (req.files?.marksheet?.[0]) {
+//       updatedFields.marksheet = req.files.marksheet[0].key;
+//     }
+
+//     let classDetails = null;
+
+//     if (mongoose.Types.ObjectId.isValid(className)) {
+
+//       classDetails =
+//         (await School.findById(className)) ||
+//         (await College.findById(className));
+
+//       if (classDetails?.updatedBy) {
+
+//         let shouldClone = false;
+
+//         if (existingUser.className?.toString() !== className?.toString()) {
+//           shouldClone = true;
+//         }
+
+//         if (
+//           existingUser.className?.toString() === className?.toString() &&
+//           (
+//             existingUser.session !== classDetails.session ||
+//             existingUser.startDate !== classDetails.startDate ||
+//             existingUser.endDate !== classDetails.endDate
+//           )
+//         ) {
+//           shouldClone = true;
+//         }
+
+//         if (shouldClone) {
+
+//           const hasLearning = await LearningScore.exists({
+//             userId: existingUser._id,
+//             classId: existingUser.className,
+//             session: existingUser.session
+//           });
+
+//           if (hasLearning) {
+
+//             const alreadyExists = await UserHistory.exists({
+//               originalUserId: existingUser._id,
+//               className: existingUser.className,
+//               session: existingUser.session
+//             });
+
+//             if (!alreadyExists) {
+
+//               const userData = existingUser.toObject();
+
+//               delete userData._id;
+//               delete userData.__v;
+
+//               await UserHistory.create({
+//                 ...userData,
+//                 originalUserId: existingUser._id,
+//                 clonedAt: new Date(),
+//                 paymentStatus: true
+//               });
+
+//               updatedFields.userLevelData = [];
+//               updatedFields.bonuspoint = 0;
+
+              
+//               updatedFields.paymentStatus = false;
+
+//             }
+//           }
+//         }
+
+//         const admin = await Admin1.findById(classDetails.updatedBy);
+
+//         if (admin) {
+
+//           updatedFields.updatedBy = admin._id;
+//           updatedFields.userBy = admin._id;
+
+//           updatedFields.adminStatus = admin.status;
+//           updatedFields.session = admin.session;
+
+//         }
+
+//         updatedFields.startDate = classDetails.startDate;
+//         updatedFields.endDate = classDetails.endDate;
+
+//       }
+
+//     }
+
+//     const user = await User.findByIdAndUpdate(
+//       userId,
+//       updatedFields,
+//       { new: true }
+//     )
+//       .populate("countryId", "name")
+//       .populate("stateId", "name")
+//       .populate("cityId", "name")
+//       .populate("updatedBy", "email session");
+
+//     const formattedUser = {
+//       ...user._doc,
+//       country: user.countryId?.name || "",
+//       state: user.stateId?.name || "",
+//       city: user.cityId?.name || "",
+//       institutionName: schoolName || collegeName || instituteName || "",
+//       institutionType: studentType || "",
+//       classOrYear: classDetails?.name || "",
+//       session: user.session || "",
+//       updatedBy: user.updatedBy || null
+//     };
+
+//     return res.status(200).json({
+//       message: "Profile updated successfully.",
+//       user: formattedUser
+//     });
+
+//   } catch (error) {
+
+//     console.error("Update Profile Error:", error);
+
+//     return res.status(500).json({
+//       message: error.message
+//     });
+
+//   }
+// };
+
+
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const existingUser = await User.findById(userId);
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    let {
+      countryId,
+      stateId,
+      cityId,
+      pincode,
+      studentType,
+      schoolName,
+      instituteName,
+      collegeName,
+      className
+    } = req.body;
+
+    if (pincode && !/^\d+$/.test(pincode)) {
+      return res.status(400).json({ message: "Invalid Pincode" });
+    }
+
+    const updatedFields = {
+      pincode,
+      studentType,
+      schoolName,
+      instituteName,
+      collegeName
+    };
+
+    if (mongoose.Types.ObjectId.isValid(countryId)) updatedFields.countryId = countryId;
+    if (mongoose.Types.ObjectId.isValid(stateId)) updatedFields.stateId = stateId;
+    if (mongoose.Types.ObjectId.isValid(cityId)) updatedFields.cityId = cityId;
+    if (mongoose.Types.ObjectId.isValid(className)) updatedFields.className = className;
+
+    if (req.files?.marksheet?.[0]) {
+      updatedFields.marksheet = req.files.marksheet[0].key;
+    }
+
+    let classDetails = null;
+
+    if (mongoose.Types.ObjectId.isValid(className)) {
+
+      classDetails =
+        (await School.findById(className)) ||
+        (await College.findById(className));
+
+      if (classDetails) {
+
+        let shouldClone = false;
+
+        if (existingUser.className?.toString() !== className?.toString()) {
+          shouldClone = true;
+        }
+
+        if (
+          existingUser.className?.toString() === className?.toString() &&
+          (
+            existingUser.session !== classDetails.session ||
+            existingUser.startDate !== classDetails.startDate ||
+            existingUser.endDate !== classDetails.endDate
+          )
+        ) {
+          shouldClone = true;
+        }
+
+        if (shouldClone) {
+
+          const hasLearning = await LearningScore.exists({
+            userId: existingUser._id,
+            classId: existingUser.className,
+            session: existingUser.session
+          });
+
+          if (hasLearning) {
+
+            const alreadyExists = await UserHistory.exists({
+              originalUserId: existingUser._id,
+              className: existingUser.className,
+              session: existingUser.session
+            });
+
+            if (!alreadyExists) {
+
+              const userData = existingUser.toObject();
+
+              delete userData._id;
+              delete userData.__v;
+
+              await UserHistory.create({
+                ...userData,
+                originalUserId: existingUser._id,
+                clonedAt: new Date(),
+                paymentStatus: true
+              });
+
+              updatedFields.userLevelData = [];
+              updatedFields.bonuspoint = 0;
+              updatedFields.paymentStatus = false;
+
+            }
+          }
+        }
+
+        const activeAdmin = await Admin.findOne({ status: true });
+
+        if (activeAdmin) {
+
+          updatedFields.updatedBy = activeAdmin._id;
+          updatedFields.userBy = activeAdmin._id;
+
+          updatedFields.adminStatus = activeAdmin.status;
+          updatedFields.session = activeAdmin.session;
+
+        }
+
+        updatedFields.startDate = classDetails.startDate;
+        updatedFields.endDate = classDetails.endDate;
+
+      }
+
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updatedFields,
+      { new: true }
+    )
+      .populate("countryId", "name")
+      .populate("stateId", "name")
+      .populate("cityId", "name")
+      .populate("updatedBy", "email session");
+
+    const formattedUser = {
+      ...user._doc,
+      country: user.countryId?.name || "",
+      state: user.stateId?.name || "",
+      city: user.cityId?.name || "",
+      institutionName: schoolName || collegeName || instituteName || "",
+      institutionType: studentType || "",
+      classOrYear: classDetails?.name || "",
+      session: user.session || "",
+      updatedBy: user.updatedBy || null
+    };
+
+    return res.status(200).json({
+      message: "Profile updated successfully.",
+      user: formattedUser
+    });
+
+  } catch (error) {
+
+    console.error("Update Profile Error:", error);
+
+    return res.status(500).json({
+      message: error.message
+    });
+
+  }
+};
+
+exports.updateProfileStatus = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const user = await User.findByIdAndUpdate(
+      userId,
+      {
+        status: 'yes',
+        updatedAt: new Date() 
+      },
+      { new: true }
+    );
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'yes' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+// exports.updateProfileStatus = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+
+//     const merchantTransactionId = "MT" + Date.now();
+//     const amount = 100 * 100; 
+
+//     const payload = {
+//       merchantId: process.env.PHONEPE_MERCHANT_ID,
+//       merchantTransactionId,
+//       merchantUserId: userId,
+//       amount,
+//       redirectUrl: "https://backend.shikshacart.com/api/phonepe/redirect",
+//       redirectMode: "POST",
+//       callbackUrl: "https://backend.shikshacart.com/api/phonepe/callback",
+//       paymentInstrument: { type: "PAY_PAGE" }
+//     };
+
+//     const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString("base64");
+
+//     const stringToSign =
+//       payloadBase64 + "/pg/v1/pay" + process.env.PHONEPE_SALT_KEY;
+
+//     const checksum =
+//       crypto.createHash("sha256").update(stringToSign).digest("hex") +
+//       "###" +
+//       process.env.PHONEPE_SALT_INDEX;
+
+//     const response = await axios.post(
+//       `${process.env.PHONEPE_BASE_URL}/pg/v1/pay`,
+//       { request: payloadBase64 },
+//       {
+//         headers: {
+//           "Content-Type": "application/json",
+//           "X-VERIFY": checksum
+//         }
+//       }
+//     );
+
+    
+//     return res.status(200).json({
+//       success: true,
+//       redirectUrl:
+//         response.data.data.instrumentResponse.redirectInfo.url
+//     });
+
+//   } catch (error) {
+//     return res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+exports.UserSessionDetails = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId)
+      .populate('updatedBy', 'email session startDate endDate');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+
+    const admin = user.updatedBy;
+
+    if (!admin) {
+      return res.status(404).json({ message: 'No session found for that user.' });
+    }
+
+    res.status(200).json({
+      message: 'User session details fetched successfully.',
+      Email: admin.email,
+      session: admin.session,
+      startDate: admin.startDate,
+      endDate: admin.endDate
+    });
+  } catch (error) {
+    console.error('Get User Session Details Error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+// exports.getActiveSessionUsers = async (req, res) => {
+//   try {
+
+//     const { startDate, endDate, fields } = req.query;
+
+//     let filterStart = null;
+//     let filterEnd = null;
+
+//     if (startDate && endDate) {
+
+//       filterStart = moment(startDate, 'DD-MM-YYYY', true).startOf('day');
+//       filterEnd = moment(endDate, 'DD-MM-YYYY', true).endOf('day');
+
+//       if (!filterStart.isValid() || !filterEnd.isValid()) {
+//         return res.status(400).json({
+//           message: 'Invalid date format. Use DD-MM-YYYY.'
+//         });
+//       }
+//     }
+
+//     const baseUrl = `${req.protocol}://${req.get('host')}`;
+//     const today = moment().tz('Asia/Kolkata').startOf('day');
+
+//     const users = await User.find({})
+//       .populate('cityId', 'name')
+//       .populate('stateId', 'name')
+//       .populate('countryId', 'name')
+//       .lean();
+
+//     const historyUsers = await UserHistory.find({})
+//       .populate('cityId', 'name')
+//       .populate('stateId', 'name')
+//       .populate('countryId', 'name')
+//       .lean();
+
+//     const allUsers = [...users, ...historyUsers];
+
+//     const finalUsers = [];
+
+//     for (const user of allUsers) {
+
+//       if (!startDate && !endDate && user.status === 'yes') {
+//         continue;
+//       }
+
+//       if (filterStart && filterEnd) {
+
+//         if (!user.startDate || !user.endDate) {
+//           continue;
+//         }
+
+//         const userStartCheck = moment(user.startDate, 'DD-MM-YYYY', true).startOf('day');
+//         const userEndCheck = moment(user.endDate, 'DD-MM-YYYY', true).endOf('day');
+
+//         if (!userStartCheck.isValid() || !userEndCheck.isValid()) {
+//           continue;
+//         }
+
+//         if (
+//           userStartCheck.isBefore(filterStart) ||
+//           userEndCheck.isAfter(filterEnd)
+//         ) {
+//           continue;
+//         }
+//       }
+
+//       let admin = null;
+//       let adminStatus = "N/A";
+
+//       if (user.updatedBy && mongoose.Types.ObjectId.isValid(user.updatedBy)) {
+
+//         admin = await Admin1.findById(user.updatedBy)
+//           .select('startDate endDate status')
+//           .lean();
+//       }
+
+//       if (admin) {
+
+//         adminStatus = admin.status;
+
+       
+//         if (!user.originalUserId && user.adminStatus !== admin.status) {
+
+//           await User.updateOne(
+//             { _id: user._id },
+//             { $set: { adminStatus: admin.status } }
+//           );
+
+//           user.adminStatus = admin.status;
+//         }
+
+//         if (admin.startDate && admin.endDate) {
+
+//           const adminStart = moment(admin.startDate, 'DD-MM-YYYY', true).startOf('day');
+//           const adminEnd = moment(admin.endDate, 'DD-MM-YYYY', true).endOf('day');
+
+//           if (adminStart.isValid() && adminEnd.isValid()) {
+
+//             const userStart = moment(user.startDate, 'DD-MM-YYYY', true);
+//             const userEnd = moment(user.endDate, 'DD-MM-YYYY', true);
+
+//             if (
+//               !userStart.isSame(adminStart, 'day') ||
+//               !userEnd.isSame(adminEnd, 'day')
+//             ) {
+
+//               if (!user.originalUserId) {
+
+//                 await User.updateOne(
+//                   { _id: user._id },
+//                   {
+//                     $set: {
+//                       startDate: admin.startDate,
+//                       endDate: admin.endDate
+//                     }
+//                   }
+//                 );
+//               }
+
+//               user.startDate = admin.startDate;
+//               user.endDate = admin.endDate;
+//             }
+
+//           }
+
+//         }
+
+//       }
+
+//       const fileFields = ['aadharCard', 'marksheet', 'otherDocument', 'photo'];
+
+//       fileFields.forEach(field => {
+
+//         if (user[field]) {
+
+//           const match = user[field].match(/uploads\/(.+)$/);
+
+//           if (match && match[1]) {
+//             user[field] = `${baseUrl}/uploads/${match[1]}`;
+//           }
+
+//         }
+
+//       });
+
+//       const formattedUser = {
+//         ...user,
+//          _id: user.originalUserId ? user.originalUserId : user._id,
+//         country: user.countryId?.name || '',
+//         state: user.stateId?.name || '',
+//         city: user.cityId?.name || '',
+//         adminStatus: adminStatus,
+//         platformDetails: user._id
+//       };
+
+//       if (fields) {
+
+//         const requestedFields = fields.split(',');
+//         const limited = {};
+
+//         requestedFields.forEach(f => {
+
+//           if (formattedUser.hasOwnProperty(f)) {
+//             limited[f] = formattedUser[f];
+//           }
+
+//         });
+
+//         finalUsers.push(limited);
+
+//       } else {
+
+//         finalUsers.push(formattedUser);
+
+//       }
+
+//     }
+
+//     return res.status(200).json({
+//       message: 'Filtered users synced with admin dates and status verified.',
+//       count: finalUsers.length,
+//       users: finalUsers
+//     });
+
+//   } catch (error) {
+
+//     console.error('Error:', error);
+
+//     return res.status(500).json({
+//       message: error.message
+//     });
+
+//   }
+// };
+
+
+exports.getActiveSessionUsers = async (req, res) => {
+  try {
+
+    const { startDate, endDate, fields } = req.query;
+
+    let filterStart = null;
+    let filterEnd = null;
+
+    if (startDate && endDate) {
+
+      filterStart = moment(startDate, 'DD-MM-YYYY', true).startOf('day');
+      filterEnd = moment(endDate, 'DD-MM-YYYY', true).endOf('day');
+
+      if (!filterStart.isValid() || !filterEnd.isValid()) {
+        return res.status(400).json({
+          message: 'Invalid date format. Use DD-MM-YYYY.'
+        });
+      }
+    }
+
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+
+    const users = await User.find({})
+      .populate('cityId', 'name')
+      .populate('stateId', 'name')
+      .populate('countryId', 'name')
+      .lean();
+
+    const historyUsers = await UserHistory.find({})
+      .populate('cityId', 'name')
+      .populate('stateId', 'name')
+      .populate('countryId', 'name')
+      .lean();
+
+    const allUsers = [...users, ...historyUsers];
+
+    const finalUsers = [];
+
+    for (const user of allUsers) {
+
+      if (!startDate && !endDate && user.status === 'yes') {
+        continue;
+      }
+
+      if (filterStart && filterEnd) {
+
+        if (!user.startDate || !user.endDate) {
+          continue;
+        }
+
+        const userStartCheck = moment(user.startDate, 'DD-MM-YYYY', true).startOf('day');
+        const userEndCheck = moment(user.endDate, 'DD-MM-YYYY', true).endOf('day');
+
+        if (!userStartCheck.isValid() || !userEndCheck.isValid()) {
+          continue;
+        }
+
+        if (
+          userStartCheck.isBefore(filterStart) ||
+          userEndCheck.isAfter(filterEnd)
+        ) {
+          continue;
+        }
+      }
+
+      let admin = null;
+      let adminStatus = "N/A";
+
+      if (user.updatedBy && mongoose.Types.ObjectId.isValid(user.updatedBy)) {
+
+        admin = await Admin1.findById(user.updatedBy)
+          .select('startDate endDate status')
+          .lean();
+      }
+
+      if (admin) {
+
+        adminStatus = admin.status;
+
+        if (!user.originalUserId && user.adminStatus !== admin.status) {
+
+          await User.updateOne(
+            { _id: user._id },
+            { $set: { adminStatus: admin.status } }
+          );
+
+          user.adminStatus = admin.status;
+        }
+
+        if (admin.startDate && admin.endDate) {
+
+          const adminStart = moment(admin.startDate, 'DD-MM-YYYY', true).startOf('day');
+          const adminEnd = moment(admin.endDate, 'DD-MM-YYYY', true).endOf('day');
+
+          if (adminStart.isValid() && adminEnd.isValid()) {
+
+            const userStart = moment(user.startDate, 'DD-MM-YYYY', true);
+            const userEnd = moment(user.endDate, 'DD-MM-YYYY', true);
+
+            if (
+              !userStart.isSame(adminStart, 'day') ||
+              !userEnd.isSame(adminEnd, 'day')
+            ) {
+
+              if (!user.originalUserId) {
+
+                await User.updateOne(
+                  { _id: user._id },
+                  {
+                    $set: {
+                      startDate: admin.startDate,
+                      endDate: admin.endDate
+                    }
+                  }
+                );
+              }
+
+              user.startDate = admin.startDate;
+              user.endDate = admin.endDate;
+            }
+
+          }
+
+        }
+
+      }
+
+     
+      let sessionStatus = false;
+
+      if (user.adminStatus === true && user.paymentStatus === true) {
+        sessionStatus = true;
+      }
+
+      if (!user.originalUserId && user.sessionStatus !== sessionStatus) {
+
+        await User.updateOne(
+          { _id: user._id },
+          { $set: { sessionStatus: sessionStatus } }
+        );
+
+        user.sessionStatus = sessionStatus;
+      }
+
+      const fileFields = ['aadharCard', 'marksheet', 'otherDocument', 'photo'];
+
+      fileFields.forEach(field => {
+
+        if (user[field]) {
+
+          const match = user[field].match(/uploads\/(.+)$/);
+
+          if (match && match[1]) {
+            user[field] = `${baseUrl}/uploads/${match[1]}`;
+          }
+
+        }
+
+      });
+
+      const formattedUser = {
+        ...user,
+        _id: user.originalUserId ? user.originalUserId : user._id,
+        country: user.countryId?.name || '',
+        state: user.stateId?.name || '',
+        city: user.cityId?.name || '',
+        adminStatus: adminStatus,
+        sessionStatus: user.sessionStatus ?? false,
+        platformDetails: user._id
+      };
+
+      if (fields) {
+
+        const requestedFields = fields.split(',');
+        const limited = {};
+
+        requestedFields.forEach(f => {
+
+          if (formattedUser.hasOwnProperty(f)) {
+            limited[f] = formattedUser[f];
+          }
+
+        });
+
+        finalUsers.push(limited);
+
+      } else {
+
+        finalUsers.push(formattedUser);
+
+      }
+
+    }
+
+    return res.status(200).json({
+      message: 'Filtered users synced with admin dates and status verified.',
+      count: finalUsers.length,
+      users: finalUsers
+    });
+
+  } catch (error) {
+
+    console.error('Error:', error);
+
+    return res.status(500).json({
+      message: error.message
+    });
+
+  }
+};
+
+exports.getUserHistories = async (req, res) => {
+  try {
+    const { originalUserId } = req.query; 
+
+    let filter = {};
+    if (originalUserId && mongoose.Types.ObjectId.isValid(originalUserId)) {
+      filter.originalUserId = originalUserId;
+    }
+
+    let histories = await UserHistory.find(filter)
+      .populate('updatedBy', 'email session startDate endDate endTime name role')
+      .populate('countryId', 'name')
+      .populate('stateId', 'name')
+      .populate('cityId', 'name')
+      .sort({ clonedAt: -1 })
+      .lean();
+
+    
+    for (const hist of histories) {
+      
+      let classDetails = null;
+      if (hist.className && mongoose.Types.ObjectId.isValid(hist.className)) {
+        classDetails = (await School.findById(hist.className).lean()) || (await College.findById(hist.className).lean());
+      }
+
+      
+      hist.institutionName = hist.schoolName || hist.collegeName || hist.instituteName || '';
+      hist.institutionType = hist.studentType || '';
+
+      hist.classOrYear = (classDetails && classDetails.price != null) ? classDetails.name : null;
+
+      
+      hist.country = hist.countryId?.name || '';
+      hist.state = hist.stateId?.name || '';
+      hist.city = hist.cityId?.name || '';
+
+      
+      delete hist.countryId;
+      delete hist.stateId;
+      delete hist.cityId;
+    }
+
+    res.status(200).json({
+      message: 'User histories fetched successfully',
+      count: histories.length,
+      data: histories
+    });
+
+  } catch (error) {
+    console.error('Error fetching User Histories:', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+exports.getStatesFromUsers = async (req, res) => {
+  try {
+    const users = await User.find({ stateId: { $ne: null } }).select("stateId");
+    if (!users.length) {
+      return res.status(200).json({
+        message: "No users with stateId found",
+        states: []
+      });
+    }
+
+    const uniqueStateIds = [...new Set(users.map(u => u.stateId.toString()))];
+
+    
+    const states = await Location.find({
+      _id: { $in: uniqueStateIds },
+      type: "state" 
+    }).select("_id name");
+
+    return res.status(200).json({
+      message: "User-based states fetched successfully",
+      states
+    });
+
+  } catch (error) {
+    console.error("getStatesFromUsers Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getCitiesFromUsers = async (req, res) => {
+  try {
+    let { stateId } = req.query; 
+
+    if (!stateId) {
+      return res.status(400).json({ message: "stateId(s) are required" });
+    }
+
+   
+    if (!Array.isArray(stateId)) {
+      stateId = stateId.split(","); 
+    }
+
+   
+    const users = await User.find({ stateId: { $in: stateId } }).select("cityId");
+
+    if (!users.length) {
+      return res.status(200).json({ message: "No cities found for these states", cities: [] });
+    }
+
+   
+    const uniqueCityIds = [...new Set(users.map(u => u.cityId?.toString()).filter(Boolean))];
+
+    
+    const cities = await Location.find({
+      _id: { $in: uniqueCityIds },
+      type: "city"
+    }).select("_id name");
+
+    return res.status(200).json({
+      message: "User-based cities fetched successfully",
+      cities
+    });
+
+  } catch (error) {
+    console.error("getCitiesFromUsers Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+exports.getCategoriesFromUsers = async (req, res) => {
+  try {
+    let { className, stateId, cityId } = req.query;
+
+   
+    let filterQuery = {};
+    if (className) filterQuery.className = className;
+
+    if (stateId) {
+      if (Array.isArray(stateId)) filterQuery.stateId = { $in: stateId };
+      else if (stateId.includes(",")) filterQuery.stateId = { $in: stateId.split(",") };
+      else filterQuery.stateId = stateId;
+    }
+
+    if (cityId) {
+      if (Array.isArray(cityId)) filterQuery.cityId = { $in: cityId };
+      else if (cityId.includes(",")) filterQuery.cityId = { $in: cityId.split(",") };
+      else filterQuery.cityId = cityId;
+    }
+
+   
+    const users = await User.find(filterQuery).select("_id");
+
+    if (!users.length) {
+      return res.status(200).json({ message: "No users found", categories: [] });
+    }
+
+    const userIds = users.map((u) => u._id);
+
+    
+    const examStatuses = await ExamUserStatus.find({ userId: { $in: userIds } })
+      .populate({
+        path: "examId",
+        select: "category",
+        populate: { path: "category", select: "_id name" },
+      })
+      .lean();
+
+   
+    const uniqueCategoriesMap = {};
+    examStatuses.forEach((ex) => {
+      if (ex.examId?.category?._id) {
+        uniqueCategoriesMap[ex.examId.category._id] = {
+          _id: ex.examId.category._id,
+          name: ex.examId.category.name,
+        };
+      }
+    });
+
+    const uniqueCategories = Object.values(uniqueCategoriesMap);
+
+    return res.status(200).json({
+      message: "User-based categories fetched successfully",
+      categories: uniqueCategories,
+    });
+  } catch (error) {
+    console.error("getCategoriesFromUsers Error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+
+exports.userforAdmin = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+    let {
+      className,
+      stateId,
+      cityId,
+      categoryId,
+      schoolershipstatus,
+      status,
+      page = 1,
+      limit = 10,
+      fields
+    } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    const admin = await Admin1.findById(adminId).select("startDate endDate");
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found." });
+    }
+
+    const adminStart = moment(admin.startDate, "DD-MM-YYYY").startOf("day");
+    const adminEnd = moment(admin.endDate, "DD-MM-YYYY").endOf("day");
+
+    let filterQuery = {
+      userBy: adminId
+    };
+
+    if (className) filterQuery.className = className;
+
+    if (stateId) {
+      filterQuery.stateId = stateId.includes(",")
+        ? { $in: stateId.split(",") }
+        : stateId;
+    }
+
+    if (cityId) {
+      filterQuery.cityId = cityId.includes(",")
+        ? { $in: cityId.split(",") }
+        : cityId;
+    }
+
+    const users = await User.find(filterQuery)
+      .populate("countryId", "name")
+      .populate("stateId", "name")
+      .populate("cityId", "name")
+      .populate("updatedBy", "email name role");
+
+    const userIds = users.map(u => u._id);
+
+    const groups = await userexamGroup.find({
+      members: { $in: userIds }
+    })
+      .populate({
+        path: "category",
+        match: { createdBy: adminId },
+        select: "_id name"
+      })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const userGroupCategoryMap = {};
+    groups.forEach(g => {
+      if (!g.category) return;
+
+      g.members.forEach(uid => {
+        if (!userGroupCategoryMap[uid]) {
+          userGroupCategoryMap[uid] = g.category;
+        }
+      });
+    });
+
+    const defaultCategory = await Schoolercategory.findOne({
+      createdBy: adminId
+    })
+      .select("_id name")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const examStatuses = await ExamUserStatus.find({
+      userId: { $in: userIds }
+    })
+      .select("userId category result attemptStatus")
+      .lean();
+
+    const failedMap = {};
+    examStatuses.forEach(es => {
+      if (es.result === "failed" && es.category?._id) {
+        const key = `${es.userId}_${es.category._id}`;
+        failedMap[key] = true;
+      }
+    });
+
+    const categoryTopUsers = await CategoryTopUser.find({
+      userId: { $in: userIds }
+    })
+      .select("userId schoolerStatus")
+      .lean();
+
+    const finalistMap = {};
+    categoryTopUsers.forEach(ctu => {
+      const key = `${ctu.userId}_${ctu.schoolerStatus}`;
+      finalistMap[key] = true;
+    });
+
+    let finalUsers = [];
+
+    for (let user of users) {
+
+      let classDetails = null;
+      let classOrYear = "";
+
+      if (user.className && mongoose.Types.ObjectId.isValid(user.className)) {
+
+        classDetails =
+          (await School.findById(user.className).select("name")) ||
+          (await College.findById(user.className).select("name"));
+
+        if (classDetails) {
+
+          const priceData = await InstitutionPrice.findOne({
+            classId: user.className,
+            type: user.studentType
+          }).select("price");
+
+          if (priceData && priceData.price != null) {
+            classOrYear = classDetails.name;
+          }
+        }
+      }
+
+      let category =
+        userGroupCategoryMap[user._id] || defaultCategory || null;
+
+      let computedSchoolershipstatus = "NA";
+
+      if (category?._id) {
+        computedSchoolershipstatus = "Participant";
+
+        const key = `${user._id}_${category._id}`;
+
+        if (failedMap[key]) computedSchoolershipstatus = "Eliminated";
+
+        const notAttempted = examStatuses.find(
+          es =>
+            es.userId.toString() === user._id.toString() &&
+            es.category?._id?.toString() === category._id.toString() &&
+            es.attemptStatus === "Not Attempted"
+        );
+
+        if (notAttempted) computedSchoolershipstatus = "Eliminated";
+
+        if (finalistMap[key]) computedSchoolershipstatus = "Finalist";
+      }
+
+      let userObj = {
+        _id: user._id,
+        firstName: user.firstName,
+        middleName: user.middleName,
+        lastName: user.lastName,
+        mobileNumber: user.mobileNumber,
+        email: user.email,
+        VerifyEmail: user.VerifyEmail,
+        status: user.status,
+        aadharCard: user.aadharCard,
+        pincode: user.pincode,
+        className: user.className,
+        studentType: user.studentType,
+        instituteName:
+          user.schoolName || user.collegeName || user.instituteName || "",
+        countryId: user.countryId,
+        stateId: user.stateId,
+        cityId: user.cityId,
+        country: user.countryId?.name || "",
+        state: user.stateId?.name || "",
+        city: user.cityId?.name || "",
+        startDate: user.startDate,
+        endDate: user.endDate,
+        session: user.session,
+        classOrYear,
+        category: user.className ? (category || null) : null,
+        schoolershipstatus: user.className ? computedSchoolershipstatus : null
+      };
+
+      finalUsers.push(userObj);
+    }
+
+    if (categoryId) {
+      const categoriesArray = categoryId.split(",");
+      finalUsers = finalUsers.filter(
+        u =>
+          u.category?._id &&
+          categoriesArray.includes(u.category._id.toString())
+      );
+    }
+
+    if (schoolershipstatus) {
+      const statusArray = schoolershipstatus.split(",").map(s => s.trim());
+      finalUsers = finalUsers.filter(u =>
+        statusArray.includes(u.schoolershipstatus)
+      );
+    }
+
+    if (status) {
+      const statusArray = status.split(",").map(s => s.trim().toLowerCase());
+      finalUsers = finalUsers.filter(
+        u => u.status && statusArray.includes(u.status.toLowerCase())
+      );
+    }
+
+    if (fields) {
+      const reqFields = fields.split(",").map(f => f.trim());
+      finalUsers = finalUsers.map(u => {
+        const obj = { _id: u._id };
+        reqFields.forEach(f => {
+          if (u[f] !== undefined) obj[f] = u[f];
+        });
+        return obj;
+      });
+    }
+
+    const totalUsers = finalUsers.length;
+    const paginated = finalUsers.slice(skip, skip + limit);
+
+    const from = totalUsers === 0 ? 0 : skip + 1;
+    const to = Math.min(skip + paginated.length, totalUsers);
+
+    return res.status(200).json({
+      message: "Users fetched successfully",
+      page,
+      limit,
+      totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
+      from,
+      to,
+      users: paginated
+    });
+
+  } catch (error) {
+    console.error("userforAdmin Error:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+
+// exports.userforAdmin = async (req, res) => {
+//   try {
+//     const adminId = req.user._id;
+//     let {
+//       className,
+//       stateId,
+//       cityId,
+//       categoryId,
+//       schoolershipstatus,
+//       status,
+//       page = 1,
+//       limit = 10,
+//       fields
+//     } = req.query;
+
+//     page = parseInt(page);
+//     limit = parseInt(limit);
+//     const skip = (page - 1) * limit;
+
+//     const admin = await Admin1.findById(adminId).select("startDate endDate");
+//     if (!admin) {
+//       return res.status(404).json({ message: "Admin not found." });
+//     }
+
+//     const adminStart = moment(admin.startDate, "DD-MM-YYYY").startOf("day");
+//     const adminEnd = moment(admin.endDate, "DD-MM-YYYY").endOf("day");
+
+//     let filterQuery = {
+//       userBy: adminId
+//     };
+
+//     if (className) filterQuery.className = className;
+
+//     if (stateId) {
+//       filterQuery.stateId = stateId.includes(",")
+//         ? { $in: stateId.split(",") }
+//         : stateId;
+//     }
+
+//     if (cityId) {
+//       filterQuery.cityId = cityId.includes(",")
+//         ? { $in: cityId.split(",") }
+//         : cityId;
+//     }
+
+//     const users = await User.find(filterQuery)
+//       .populate("countryId", "name")
+//       .populate("stateId", "name")
+//       .populate("cityId", "name")
+//       .populate("updatedBy", "email name role");
+
+//     const userIds = users.map(u => u._id);
+
+//     const groups = await userexamGroup.find({
+//       members: { $in: userIds }
+//     })
+//       .populate({
+//         path: "category",
+//         match: { createdBy: adminId },
+//         select: "_id name"
+//       })
+//       .sort({ createdAt: -1 })
+//       .lean();
+
+//     const userGroupCategoryMap = {};
+//     groups.forEach(g => {
+//       if (!g.category) return;
+
+//       g.members.forEach(uid => {
+//         if (!userGroupCategoryMap[uid]) {
+//           userGroupCategoryMap[uid] = g.category;
+//         }
+//       });
+//     });
+
+//     const defaultCategory = await Schoolercategory.findOne({
+//       createdBy: adminId
+//     })
+//       .select("_id name")
+//       .sort({ createdAt: 1 })
+//       .lean();
+
+//     const examStatuses = await ExamUserStatus.find({
+//       userId: { $in: userIds }
+//     })
+//       .select("userId category result attemptStatus")
+//       .lean();
+
+//     const failedMap = {};
+//     examStatuses.forEach(es => {
+//       if (es.result === "failed" && es.category?._id) {
+//         const key = `${es.userId}_${es.category._id}`;
+//         failedMap[key] = true;
+//       }
+//     });
+
+//     const categoryTopUsers = await CategoryTopUser.find({
+//       userId: { $in: userIds }
+//     })
+//       .select("userId schoolerStatus")
+//       .lean();
+
+//     const finalistMap = {};
+//     categoryTopUsers.forEach(ctu => {
+//       const key = `${ctu.userId}_${ctu.schoolerStatus}`;
+//       finalistMap[key] = true;
+//     });
+
+//     let finalUsers = [];
+
+//     for (let user of users) {
+
+//       let classDetails = null;
+//       let classOrYear = "";
+
+//       if (user.className && mongoose.Types.ObjectId.isValid(user.className)) {
+//         classDetails =
+//           (await School.findById(user.className).select("name price")) ||
+//           (await College.findById(user.className).select("name price"));
+
+//         if (classDetails && classDetails.price != null) {
+//           classOrYear = classDetails.name;
+//         }
+//       }
+
+//       let category =
+//         userGroupCategoryMap[user._id] || defaultCategory || null;
+
+//       let computedSchoolershipstatus = "NA";
+
+//       if (category?._id) {
+//         computedSchoolershipstatus = "Participant";
+
+//         const key = `${user._id}_${category._id}`;
+
+//         if (failedMap[key]) computedSchoolershipstatus = "Eliminated";
+
+//         const notAttempted = examStatuses.find(
+//           es =>
+//             es.userId.toString() === user._id.toString() &&
+//             es.category?._id?.toString() === category._id.toString() &&
+//             es.attemptStatus === "Not Attempted"
+//         );
+
+//         if (notAttempted) computedSchoolershipstatus = "Eliminated";
+
+//         if (finalistMap[key]) computedSchoolershipstatus = "Finalist";
+//       }
+
+//       let userObj = {
+//         _id: user._id,
+//         firstName: user.firstName,
+//         middleName: user.middleName,
+//         lastName: user.lastName,
+//         mobileNumber: user.mobileNumber,
+//         email: user.email,
+//         VerifyEmail: user.VerifyEmail,
+//         status: user.status,
+//         aadharCard: user.aadharCard,
+//         pincode: user.pincode,
+//         className: user.className,
+//         studentType: user.studentType,
+//         instituteName:
+//           user.schoolName || user.collegeName || user.instituteName || "",
+//         countryId: user.countryId,
+//         stateId: user.stateId,
+//         cityId: user.cityId,
+//         country: user.countryId?.name || "",
+//         state: user.stateId?.name || "",
+//         city: user.cityId?.name || "",
+//         startDate: user.startDate,
+//         endDate: user.endDate,
+//         session: user.session,
+//         classOrYear,
+//         category: user.className ? (category || null) : null,
+//         schoolershipstatus: user.className ? computedSchoolershipstatus : null
+//       };
+
+//       finalUsers.push(userObj);
+//     }
+
+//     if (categoryId) {
+//       const categoriesArray = categoryId.split(",");
+//       finalUsers = finalUsers.filter(
+//         u =>
+//           u.category?._id &&
+//           categoriesArray.includes(u.category._id.toString())
+//       );
+//     }
+
+//     if (schoolershipstatus) {
+//       const statusArray = schoolershipstatus.split(",").map(s => s.trim());
+//       finalUsers = finalUsers.filter(u =>
+//         statusArray.includes(u.schoolershipstatus)
+//       );
+//     }
+
+//     if (status) {
+//       const statusArray = status.split(",").map(s => s.trim().toLowerCase());
+//       finalUsers = finalUsers.filter(
+//         u => u.status && statusArray.includes(u.status.toLowerCase())
+//       );
+//     }
+
+//     if (fields) {
+//       const reqFields = fields.split(",").map(f => f.trim());
+//       finalUsers = finalUsers.map(u => {
+//         const obj = { _id: u._id };
+//         reqFields.forEach(f => {
+//           if (u[f] !== undefined) obj[f] = u[f];
+//         });
+//         return obj;
+//       });
+//     }
+
+//     const totalUsers = finalUsers.length;
+//     const paginated = finalUsers.slice(skip, skip + limit);
+
+//     const from = totalUsers === 0 ? 0 : skip + 1;
+//     const to = Math.min(skip + paginated.length, totalUsers);
+
+//     return res.status(200).json({
+//       message: "Users fetched successfully",
+//       page,
+//       limit,
+//       totalUsers,
+//       totalPages: Math.ceil(totalUsers / limit),
+//       from,
+//       to,
+//       users: paginated
+//     });
+
+//   } catch (error) {
+//     console.error("userforAdmin Error:", error);
+//     return res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+exports.tempuserforAdmin = async (req, res) => {
+  try {
+    let { page = 1, limit = 10, fields } = req.query;
+
+    page = parseInt(page);
+    limit = parseInt(limit);
+    const skip = (page - 1) * limit;
+
+    
+    const totalUsers = await TempUser.countDocuments();
+
+   
+    let tempUsers = await TempUser.find()
+      .populate("countryId", "name")
+      .populate("stateId", "name")
+      .populate("cityId", "name")
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+ 
+    let finalUsers = tempUsers.map(tUser => ({
+      _id: tUser._id,
+
+      status: tUser.status,
+
+      firstName: tUser.firstName,
+      middleName: tUser.middleName,
+      lastName: tUser.lastName,
+      mobileNumber: tUser.mobileNumber,
+      email: tUser.email,
+
+      schoolershipstatus: "NA",
+      category: { _id: null, name: "NA" },
+
+      country: tUser.countryId?.name || "",
+      state: tUser.stateId?.name || "",
+      city: tUser.cityId?.name || "",
+
+      startDate: tUser.startDate,
+      endDate: tUser.endDate
+    }));
+
+   
+    if (fields) {
+      const reqFields = fields.split(",").map(f => f.trim());
+      finalUsers = finalUsers.map(u => {
+        const obj = { _id: u._id };
+        reqFields.forEach(f => {
+          if (u[f] !== undefined) obj[f] = u[f];
+        });
+        return obj;
+      });
+    }
+
+    const from = totalUsers === 0 ? 0 : skip + 1;
+    const to = Math.min(skip + finalUsers.length, totalUsers);
+
+    return res.status(200).json({
+      message: "Users fetched successfully",
+      page,
+      limit,
+      totalUsers,
+      totalPages: Math.ceil(totalUsers / limit),
+      from,
+      to,
+      users: finalUsers
+    });
+
+  } catch (error) {
+    console.error("userforAdmin Error:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+
+exports.getAvailableSchoolershipStatus = async (req, res) => {
+  try {
+    const adminId = req.user._id;
+
+    const admin = await Admin1.findById(adminId).select("startDate endDate");
+    if (!admin) {
+      return res.status(404).json({ message: "Admin not found." });
+    }
+
+    const adminStart = moment(admin.startDate, "DD-MM-YYYY").startOf("day");
+    const adminEnd = moment(admin.endDate, "DD-MM-YYYY").endOf("day");
+
+    const users = await User.find({});
+    const userIds = users.map(u => u._id);
+
+    const groups = await userexamGroup.find({
+      members: { $in: userIds }
+    }).populate("category", "_id name").lean();
+
+    const userGroupCategoryMap = {};
+    groups.forEach(g => {
+      g.members.forEach(uid => {
+        if (!userGroupCategoryMap[uid] && g.category) {
+          userGroupCategoryMap[uid] = g.category;
+        }
+      });
+    });
+
+    const defaultCategory = await Schoolercategory.findOne()
+      .select("_id name")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const examStatuses = await ExamUserStatus.find({
+      userId: { $in: userIds }
+    }).select("userId category result attemptStatus").lean();
+
+    const failedMap = {};
+    examStatuses.forEach(es => {
+      if (es.result === "failed" && es.category?._id) {
+        failedMap[`${es.userId}_${es.category._id}`] = true;
+      }
+    });
+
+    const categoryTopUsers = await CategoryTopUser.find({
+      userId: { $in: userIds }
+    }).select("userId schoolerStatus").lean();
+
+    const finalistMap = {};
+    categoryTopUsers.forEach(ctu => {
+      finalistMap[`${ctu.userId}_${ctu.schoolerStatus}`] = true;
+    });
+
+    const statusSet = new Set();
+
+    for (let user of users) {
+
+      if (user.startDate && user.endDate) {
+        const uStart = moment(user.startDate, "DD-MM-YYYY").startOf("day");
+        const uEnd = moment(user.endDate, "DD-MM-YYYY").endOf("day");
+        if (!uStart.isSameOrAfter(adminStart) || !uEnd.isSameOrBefore(adminEnd)) {
+          continue;
+        }
+      }
+
+      let status = "NA";
+      const category = userGroupCategoryMap[user._id] || defaultCategory;
+
+      if (user.status === "yes") {
+        status = "Participant";
+
+        if (category?._id) {
+          const key = `${user._id}_${category._id}`;
+
+          if (failedMap[key]) status = "Eliminated";
+
+          const notAttempted = examStatuses.find(
+            es =>
+              es.userId.toString() === user._id.toString() &&
+              es.category?._id.toString() === category._id.toString() &&
+              es.attemptStatus === "Not Attempted"
+          );
+          if (notAttempted) status = "Eliminated";
+
+          if (finalistMap[key]) status = "Finalist";
+        }
+      }
+
+      statusSet.add(status);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(statusSet)
+    });
+
+  } catch (error) {
+    console.error("getAvailableSchoolershipStatus Error:", error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+exports.getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid userId is required",
+      });
+    }
+
+    const user = await User.findById(userId)
+      .select("firstName status schoolershipstatus category userDetails")
+      .populate("category._id", "name");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+   
+    const examIds = [];
+    user.userDetails.forEach((ud) => {
+      ud.examTypes.forEach((et) => {
+        if (et.exam) examIds.push(et.exam.toString());
+      });
+    });
+
+    
+    const examStatusMap = {};
+    if (examIds.length) {
+      const examStatuses = await ExamUserStatus.find({
+        userId,
+        examId: { $in: examIds },
+      }).lean();
+
+      examStatuses.forEach((es) => {
+        examStatusMap[es.examId.toString()] = {
+          AttemptStatus: es.attemptStatus ?? "NA",
+          result: es.result ?? "NA",
+        };
+      });
+    }
+
+   
+    const examNameMap = {};
+    if (examIds.length) {
+      const exams = await Schoolerexam.find({ _id: { $in: examIds } })
+        .select("_id examName")
+        .lean();
+
+      exams.forEach((ex) => {
+        examNameMap[ex._id.toString()] = ex.examName;
+      });
+    }
+
+   
+    user.userDetails.forEach((ud) => {
+      let allowNext = true;
+      let nextStatusNA = false;
+      ud.examTypes.forEach((et, index) => {
+        if (!et.exam) return;
+
+        const statusData = examStatusMap[et.exam.toString()] || {
+          AttemptStatus: "NA",
+          result: "NA",
+        };
+
+        const attemptStatus = statusData.AttemptStatus;
+        const result = statusData.result;
+
+        et.AttemptStatus = attemptStatus;
+        et.result = result;
+
+        if (index === 0) {
+       
+          if (attemptStatus === "Attempted" && ["PASS", "PASSED"].includes(result?.toUpperCase())) {
+            allowNext = true;
+            nextStatusNA = false;
+          } else if (attemptStatus === "Attempted" && !["PASS", "PASSED"].includes(result?.toUpperCase())) {
+            allowNext = false;
+            nextStatusNA = false;
+          } else if (attemptStatus === "NA") {
+            allowNext = false;
+            nextStatusNA = true;
+          } else if (attemptStatus === "Not Attempted") {
+            allowNext = false;
+            nextStatusNA = false;
+          }
+        } else {
+         
+          if (nextStatusNA) {
+            et.status = "NA";
+          } else {
+            et.status = allowNext ? "Eligible" : "Not Eligible";
+          }
+
+          
+          if (attemptStatus === "Attempted" && !["PASS", "PASSED"].includes(result?.toUpperCase())) {
+            allowNext = false;
+            nextStatusNA = false;
+          } else if (attemptStatus === "Not Attempted") {
+            allowNext = false;
+            nextStatusNA = false;
+          } else if (attemptStatus === "NA") {
+            allowNext = false;
+            nextStatusNA = true;
+          }
+        }
+      });
+    });
+
+    await user.save();
+
+   
+    const responseUserDetails = user.userDetails.map((ud) => ({
+      _id: ud._id,
+      category: {
+        _id: ud.category?._id || null,
+        name: ud.category?.name || "NA",
+      },
+      examTypes: ud.examTypes.map((et) => ({
+        _id: et._id,
+        name: et.name,
+        status: et.status,
+        AttemptStatus: et.AttemptStatus,
+        result: et.result,
+        exam: et.exam
+          ? {
+              _id: et.exam,
+              examName: examNameMap[et.exam.toString()] || "NA",
+            }
+          : null,
+      })),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "User details fetched successfully",
+      data: {
+        firstName: user.firstName,
+        status: user.status,
+        schoolershipstatus: user.schoolershipstatus,
+        category: {
+          _id: user?.category?._id?._id || null,
+          name: user?.category?._id?.name || "NA",
+        },
+        userDetails: responseUserDetails,
+      },
+    });
+  } catch (error) {
+    console.error("getUserById error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
+  }
+};
+
+
+// exports.saveFCMToken = async (req, res) => {
+//   try {
+//     const userId = req.user._id; 
+//     const { fcmToken } = req.body;
+
+//     if (!fcmToken) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "FCM token required",
+//       });
+//     }
+
+//     await User.findByIdAndUpdate(
+//       userId,
+//       { fcmToken },
+//       { new: true }
+//     );
+
+//     return res.json({
+//       success: true,
+//       message: "FCM token saved successfully",
+//     });
+
+//   } catch (err) {
+//     console.error("Save FCM Token Error:", err);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to save FCM token",
+//     });
+//   }
+// };
+
+
+exports.deleteUserExamData = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid userId is required",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    
+    user.userDetails.forEach((detail) => {
+      detail.examTypes.forEach((exam) => {
+        exam.result = "NA";
+        exam.AttemptStatus = "NA";
+        exam.exam = null;
+        exam.status = "NA"; 
+      });
+    });
+
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "User exam result, AttemptStatus and exam reset successfully",
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+
+
+// exports.getClassTimeline = async (req, res) => {
+//   try {
+//     const userId = req.user.id;
+
+//     const user = await User.findById(userId)
+//       .populate('updatedBy', 'session startDate endDate versionName');
+
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     const history = await UserHistory.find({
+//       originalUserId: user._id
+//     })
+//       .populate('updatedBy', 'session startDate endDate versionName')
+//       .sort({ clonedAt: -1 });
+
+//     const timeline = [];
+//     if (user.paymentStatus === true) {
+//       if (mongoose.Types.ObjectId.isValid(user.className)) {
+//         const classDetails =
+//           (await School.findById(user.className)) ||
+//           (await College.findById(user.className));
+
+//         timeline.push({
+//           classOrYear: classDetails?.name || '',
+//           startDate: user.startDate || user.updatedBy?.startDate || '',
+//           endDate: user.endDate || user.updatedBy?.endDate || '',
+//           session: user.session || user.updatedBy?.session || '',
+//           versionName: user.versionName || user.updatedBy?.versionName || ''
+//         });
+//       }
+//     }
+
+//     for (const h of history) {
+//       let className = '';
+
+//       if (mongoose.Types.ObjectId.isValid(h.className)) {
+//         const classDetails =
+//           (await School.findById(h.className)) ||
+//           (await College.findById(h.className));
+
+//         className = classDetails?.name || '';
+//       }
+
+//       timeline.push({
+//         classOrYear: className,
+//         startDate: h.startDate || h.updatedBy?.startDate || '',
+//         endDate: h.endDate || h.updatedBy?.endDate || '',
+//         session: h.session || h.updatedBy?.session || '',
+//         versionName: h.versionName || h.updatedBy?.versionName || ''
+//       });
+//     }
+
+//     return res.status(200).json({
+//       classTimeline: timeline
+//     });
+
+//   } catch (error) {
+//     console.error('Get Class Timeline Error:', error);
+//     return res.status(500).json({ message: error.message });
+//   }
+// };
+
+exports.getClassTimeline = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const user = await User.findById(userId)
+      .populate('updatedBy', 'session startDate endDate versionName');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Latest SessionCard
+    const sessionData = await SessionCard.findOne({ userId })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // User History
+    const history = await UserHistory.find({
+      originalUserId: user._id
+    })
+      .populate('updatedBy', 'session startDate endDate versionName')
+      .sort({ clonedAt: -1 });
+
+    const timeline = [];
+
+    // ✅ Only startDate + endDate match
+    const isSameSession = (entry) => {
+      if (!sessionData) return false;
+
+      return (
+        entry.startDate === sessionData.startDate &&
+        entry.endDate === sessionData.endDate
+      );
+    };
+
+    let activeAssigned = false;
+
+    // ✅ Current User Entry
+    if (user.paymentStatus === true) {
+      if (mongoose.Types.ObjectId.isValid(user.className)) {
+        const classDetails =
+          (await School.findById(user.className)) ||
+          (await College.findById(user.className));
+
+        const entry = {
+          classOrYear: classDetails?.name || '',
+          startDate: user.startDate || user.updatedBy?.startDate || '',
+          endDate: user.endDate || user.updatedBy?.endDate || '',
+          session: user.session || user.updatedBy?.session || '',
+          versionName: user.versionName || user.updatedBy?.versionName || ''
+        };
+
+        let isActive = false;
+
+        if (sessionData) {
+          isActive = isSameSession(entry) && !activeAssigned;
+        } else {
+          isActive = !activeAssigned;
+        }
+
+        if (isActive) activeAssigned = true;
+
+        timeline.push({
+          ...entry,
+          activeSession: isActive
+        });
+      }
+    }
+
+    // ✅ History Entries
+    for (const h of history) {
+      let className = '';
+
+      if (mongoose.Types.ObjectId.isValid(h.className)) {
+        const classDetails =
+          (await School.findById(h.className)) ||
+          (await College.findById(h.className));
+
+        className = classDetails?.name || '';
+      }
+
+      const entry = {
+        classOrYear: className,
+        startDate: h.startDate || h.updatedBy?.startDate || '',
+        endDate: h.endDate || h.updatedBy?.endDate || '',
+        session: h.session || h.updatedBy?.session || '',
+        versionName: h.versionName || h.updatedBy?.versionName || ''
+      };
+
+      let isActive = false;
+
+      if (sessionData) {
+        isActive = isSameSession(entry) && !activeAssigned;
+      } else {
+        isActive = !activeAssigned;
+      }
+
+      if (isActive) activeAssigned = true;
+
+      timeline.push({
+        ...entry,
+        activeSession: isActive
+      });
+    }
+
+    return res.status(200).json({
+      activeSession: activeAssigned,
+      classTimeline: timeline
+    });
+
+  } catch (error) {
+    console.error('Get Class Timeline Error:', error);
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+exports.saveFCMToken = async (req, res) => {
+  try {
+    const userId = req.user._id; 
+    const { fcmToken } = req.body;
+
+    if (!fcmToken) {
+      return res.status(400).json({
+        success: false,
+        message: "FCM token required",
+      });
+    }
+
+    await User.findByIdAndUpdate(
+      userId,
+      { fcmToken },
+      { new: true }
+    );
+
+    return res.json({
+      success: true,
+      message: "FCM token saved successfully",
+    });
+
+  } catch (err) {
+    console.error("Save FCM Token Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save FCM token",
+    });
+  }
+};
+
+
+exports.createRazorpayOrder = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { amount } = req.body;
+
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid amount required",
+      });
+    }
+
+    const options = {
+      amount: amount * 100, 
+      currency: "INR",
+      receipt: `receipt_${Date.now()}`,
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    await Payment.create({
+      userId,
+      razorpayOrderId: order.id,
+      amount: options.amount,
+      displayAmount: amount,
+      status: "CREATED",
+    });
+
+    return res.json({
+      success: true,
+      orderId: order.id,
+      key: process.env.RAZORPAY_KEY_ID,
+      amount: options.amount,
+      currency: "INR",
+    });
+
+  } catch (error) {
+    console.error("ORDER ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Order creation failed",
+    });
+  }
+};
+
+exports.verifyRazorpayPayment = async (req, res) => {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
+
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+
+    const expectedSignature = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(body.toString())
+      .digest("hex");
+
+    if (expectedSignature !== razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment verification failed",
+      });
+    }
+
+    const payment = await Payment.findOneAndUpdate(
+      { razorpayOrderId: razorpay_order_id },
+      {
+        status: "COMPLETED",
+        razorpayPaymentId: razorpay_payment_id,
+      },
+      { new: true }
+    );
+
+    if (payment?.userId) {
+      await User.findByIdAndUpdate(payment.userId, {
+        status: "yes",
+         paymentStatus: true,
+        updatedAt: new Date(),
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Payment successful",
+    });
+
+  } catch (error) {
+    console.error("VERIFY ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Verification failed",
+    });
+  }
+};
+
+exports.PaymentDetailsByOrderId = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+
+    const payments = await razorpay.orders.fetchPayments(orderId);
+
+    if (!payments.items.length) {
+      return res.json({
+        success: false,
+        message: "No payment found for this order",
+      });
+    }
+
+    const payment = payments.items[0];
+
+    let updatedStatus = "CREATED";
+
+    if (payment.status === "captured") {
+      updatedStatus = "COMPLETED";
+    } else if (payment.status === "failed") {
+      updatedStatus = "FAILED";
+    }
+    await Payment.findOneAndUpdate(
+      { razorpayOrderId: orderId },
+      {
+        status: updatedStatus,
+        razorpayPaymentId: payment.id,
+        paymentMethod: payment.method,
+      },
+      { new: true }
+    );
+
+    return res.json({
+      success: true,
+      orderId,
+      paymentId: payment.id,   
+      status: updatedStatus,
+      method: payment.method,
+      amount: payment.amount / 100,
+      currency: payment.currency,
+    });
+
+  } catch (error) {
+    console.error("CHECK STATUS ERROR:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching payment status",
+    });
+  }
+};
+
+
+exports.getUserVersion = async (req, res) => {
+  try {
+
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        message: "Token not provided."
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    if (!user.userBy) {
+      return res.status(404).json({
+        message: "Admin not assigned to this user"
+      });
+    }
+
+    const admin = await Admin1.findById(user.userBy).select("versionName");
+
+    if (!admin) {
+      return res.status(404).json({
+        message: "Admin not found"
+      });
+    }
+
+    return res.status(200).json({
+      versionName: admin.versionName
+    });
+
+  } catch (error) {
+
+    return res.status(401).json({
+      message: "Token invalid or expired",
+      error: error.message
+    });
+
+  }
+};
+
+// exports.getUserVersion = async (req, res) => {
+//   try {
+
+//     const authHeader = req.headers.authorization;
+
+//     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+//       return res.status(401).json({
+//         status: "no",
+//         message: "Token not provided."
+//       });
+//     }
+
+//     const token = authHeader.split(" ")[1];
+
+//     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+//     const user = await User.findById(decoded.id);
+
+//     if (!user) {
+//       return res.status(404).json({
+//         status: "no",
+//         message: "User not found"
+//       });
+//     }
+
+//     if (!user.userBy) {
+//       return res.status(404).json({
+//         status: "no",
+//         message: "Admin not assigned to this user"
+//       });
+//     }
+
+//     const admin = await Admin1.findById(user.userBy).select("versionName");
+
+//     if (!admin) {
+//       return res.status(404).json({
+//         status: "no",
+//         message: "Admin not found"
+//       });
+//     }
+
+//     return res.status(200).json({
+//       status: "yes",
+//       versionName: admin.versionName
+//     });
+
+//   } catch (error) {
+
+//     return res.status(401).json({
+//       status: "no",
+//       message: "Token invalid or expired",
+//       error: error.message
+//     });
+
+//   }
+// };

@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+
+  sc_backend:
+
+    image: ${DOCKERHUB_USERNAME}/sc_backend:${IMAGE_TAG}
+
+    container_name: sc_backend
+
+    restart: unless-stopped
+
+    ports:
+      - "${PORT}:${PORT}"
+
+    env_file:
+      - .env
+
+    volumes:
+      - uploads_data:/app/uploads
+
+    depends_on:
+      - mongo
+
+    networks:
+      - backend_net
+
+    pull_policy: always
+
+
+
+  mongo:
+
+    image: mongo:6
+
+    container_name: sc_mongo
+
+    restart: unless-stopped
+
+    volumes:
+      - mongo_data:/data/db
+
+    networks:
+      - backend_net
+
+
+
+networks:
+  backend_net:
+    driver: bridge
+
+
+
+volumes:
+  uploads_data:
+  mongo_data:

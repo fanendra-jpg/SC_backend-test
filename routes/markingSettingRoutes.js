@@ -1,0 +1,16 @@
+
+const express = require('express');
+const router = express.Router();
+const auth = require('../middleware/auth');
+const MarkingSettingController = require('../controllers/markingSettingCotroller');
+
+
+router.get('/marking', MarkingSettingController.getSettings);
+router.get('/bufferTime/:examId', auth,MarkingSettingController.bufferTime);
+
+
+router.post('/marking',auth, MarkingSettingController.createOrUpdateSettings);
+router.post('/sessiondetails',auth, MarkingSettingController.createSessionCard);
+
+
+module.exports = router;
