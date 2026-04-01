@@ -2268,7 +2268,8 @@ exports.userforAdmin = async (req, res) => {
     limit = parseInt(limit);
     const skip = (page - 1) * limit;
 
-    const admin = await Admin1.findById(adminId).select("startDate endDate");
+    // const admin = await Admin1.findById(adminId).select("startDate endDate");
+    const admin = await Admin1.findById(adminId).select("startDate endDate status");
     if (!admin) {
       return res.status(404).json({ message: "Admin not found." });
     }
@@ -2407,6 +2408,9 @@ exports.userforAdmin = async (req, res) => {
         if (finalistMap[key]) computedSchoolershipstatus = "Finalist";
       }
 
+      // Compute sessionStatus the same way as superadmin route
+      const sessionStatus = (admin.status === true && user.paymentStatus === true);
+
       let userObj = {
         _id: user._id,
         firstName: user.firstName,
@@ -2416,6 +2420,7 @@ exports.userforAdmin = async (req, res) => {
         email: user.email,
         VerifyEmail: user.VerifyEmail,
         status: user.status,
+        sessionStatus: sessionStatus,
         aadharCard: user.aadharCard,
         pincode: user.pincode,
         className: user.className,
