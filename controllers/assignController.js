@@ -531,7 +531,8 @@ exports.deleteAssigned = async (req, res) => {
 exports.updateAssigned = async (req, res) => {
   try {
     const { id } = req.params;
-    const updateData = req.body;
+    // const updateData = req.body;
+     const { learning, learning2, learning3, learning4, learning5, ...otherFields } = req.body;
 
     const assigned = await Assigned.findById(id);
     if (!assigned) {
@@ -551,7 +552,26 @@ exports.updateAssigned = async (req, res) => {
       }
     }
 
-    const updatedAssigned = await Assigned.findByIdAndUpdate(id, updateData, { new: true });
+    const setFields = {};
+    const unsetFields = {};
+
+    // For each learning field: set if provided, unset if null/undefined
+    const learningFields = { learning, learning2, learning3, learning4, learning5 };
+
+   for (const [key, value] of Object.entries(learningFields)) {
+      if (value !== undefined && value !== null && value !== '') {
+        setFields[key] = value;   // present with value → set
+      } else {
+        unsetFields[key] = '';    // absent or null/empty → unset
+      }
+    }
+
+    const updateQuery = {};
+    if (Object.keys(setFields).length > 0) updateQuery.$set = { ...setFields, ...otherFields };
+    if (Object.keys(unsetFields).length > 0) updateQuery.$unset = unsetFields;
+
+    // const updatedAssigned = await Assigned.findByIdAndUpdate(id, updateData, { new: true });
+    const updatedAssigned = await Assigned.findByIdAndUpdate(id, updateQuery, { new: true });
 
     res.status(200).json({
       message: 'Assigned record updated successfully.',
