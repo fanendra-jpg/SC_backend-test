@@ -1095,7 +1095,7 @@ exports.getAllActiveUsers = async (req, res) => {
         if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
         const formattedUser = {
-          ...user._doc,
+          ...user.toObject(),
           country: user.countryId?.name || "",
           state: user.stateId?.name || "",
           city: user.cityId?.name || "",
@@ -1157,7 +1157,7 @@ exports.getAllActiveUsers = async (req, res) => {
       if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
       const formattedUser = {
-        ...user._doc,
+        ...user.toObject(),
         country: user.countryId?.name || "",
         state: user.stateId?.name || "",
         city: user.cityId?.name || "",
