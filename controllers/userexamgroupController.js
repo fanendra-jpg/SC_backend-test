@@ -1007,47 +1007,54 @@ exports.getAllActiveUsers = async (req, res) => {
   try {
     const { className, groupId, stateId, cityId, category } = req.query;
 
-    const groupedUsers = await UserExamGroup.find({}, "members");
-    const allGroupedUserIds = groupedUsers.flatMap(g => g.members.map(id => id.toString()));
-
     let currentGroupMemberIds = [];
     if (groupId && mongoose.Types.ObjectId.isValid(groupId)) {
-      const currentGroup = await UserExamGroup.findById(groupId).select("members");
+      const currentGroup = await UserExamGroup.findById(groupId).select("members category");
       if (currentGroup) {
         currentGroupMemberIds = currentGroup.members.map(id => id.toString());
       }
     }
 
-    const excludeIds = allGroupedUserIds.filter(id => !currentGroupMemberIds.includes(id));
-
     const allCategories = await Category.find({}).sort({ createdAt: 1 });
     const categoryIds = allCategories.map(c => c._id.toString());
     const requestedIndex = category ? categoryIds.indexOf(category) : -1;
 
+    // Fetch groups and their categories to properly exclude users ONLY from groups in the currently requested category
+    const groupedUsers = await UserExamGroup.find({}, "members category");
+    let relevantGroups = groupedUsers;
+    if (category) {
+       relevantGroups = groupedUsers.filter(g => g.category?.toString() === category);
+    }
+    const allGroupedUserIds = relevantGroups.flatMap(g => g.members.map(id => id.toString()));
+    const excludeIds = allGroupedUserIds.filter(id => !currentGroupMemberIds.includes(id));
+
     if (category && requestedIndex !== -1) {
-      let query = { status: "yes" };
+      let query = { status: "yes", paymentStatus: true };
       if (className && mongoose.Types.ObjectId.isValid(className)) query.className = className;
       if (stateId && mongoose.Types.ObjectId.isValid(stateId)) query.stateId = stateId;
       if (cityId && mongoose.Types.ObjectId.isValid(cityId)) query.cityId = cityId;
 
+      if (excludeIds.length > 0) query._id = { $nin: excludeIds };
+
       if (requestedIndex === 0) {
-        // Bronze → show users whose category is Bronze AND status is Participant
-        query["category._id"] = categoryIds[0];
-        query.schoolershipstatus = "Participant";
-        // Participants already in a group must NOT appear when creating a new group
-        if (excludeIds.length > 0) query._id = { $nin: excludeIds };
+        // Bronze → show users whose category is Bronze (or no category) AND status is Participant or NA
+        query.$or = [
+          { "category._id": categoryIds[0] },
+          { category: null },
+          { category: { $exists: false } },
+          { "category._id": { $exists: false } }
+        ];
+        query.schoolershipstatus = { $in: ["Participant", "NA"] };
 
       } else if (requestedIndex === 1) {
         // Silver → show Bronze Finalists (promoted from Bronze)
         query["category._id"] = categoryIds[0];
         query.schoolershipstatus = "Finalist";
-        // Finalists are promoted — no group exclusion applied
 
       } else if (requestedIndex === 2) {
         // Gold → show Silver Finalists (promoted from Silver)
         query["category._id"] = categoryIds[1];
         query.schoolershipstatus = "Finalist";
-        // Finalists are promoted — no group exclusion applied
       }
 
       const users = await User.find(query)
@@ -1057,14 +1064,27 @@ exports.getAllActiveUsers = async (req, res) => {
         .populate({
           path: "updatedBy",
           match: { status: true },
-          select: "email name role status",
+          select: "email name role status startDate endDate",
         });
 
       const baseUrl = `${req.protocol}://${req.get("host")}`.replace("http://", "https://");
       let finalList = [];
+      const moment = require("moment-timezone");
 
       for (let user of users) {
         if (!user.updatedBy) continue;
+        
+        // Dynamically verify if admin is genuinely active by checking dates
+        if (user.updatedBy.startDate && user.updatedBy.endDate) {
+          const adminStartCheck = moment(user.updatedBy.startDate, 'DD-MM-YYYY', true).startOf('day');
+          const adminEndCheck = moment(user.updatedBy.endDate, 'DD-MM-YYYY', true).endOf('day');
+          const now = moment();
+          if (adminStartCheck.isValid() && adminEndCheck.isValid()) {
+            if (now.isBefore(adminStartCheck) || now.isAfter(adminEndCheck)) {
+              continue; // Skip user if their admin session has expired
+            }
+          }
+        }
 
         let classDetails = null;
         if (mongoose.Types.ObjectId.isValid(user.className)) {
@@ -1094,8 +1114,8 @@ exports.getAllActiveUsers = async (req, res) => {
       });
     }
 
-    // DEFAULT: No category query param — fetch all active users (no category filter)
-    let query = { status: "yes" };
+    // DEFAULT: No category query param — fetch all active users
+    let query = { status: "yes", paymentStatus: true };
     if (className && mongoose.Types.ObjectId.isValid(className)) query.className = className;
     if (stateId && mongoose.Types.ObjectId.isValid(stateId)) query.stateId = stateId;
     if (cityId && mongoose.Types.ObjectId.isValid(cityId)) query.cityId = cityId;
@@ -1108,14 +1128,27 @@ exports.getAllActiveUsers = async (req, res) => {
       .populate({
         path: "updatedBy",
         match: { status: true },
-        select: "email name role status",
+        select: "email name role status startDate endDate",
       });
 
     const baseUrl = `${req.protocol}://${req.get("host")}`.replace("http://", "https://");
     let finalList = [];
+    const moment = require("moment-timezone");
 
     for (let user of users) {
       if (!user.updatedBy) continue;
+
+      if (user.updatedBy.startDate && user.updatedBy.endDate) {
+        const adminStartCheck = moment(user.updatedBy.startDate, 'DD-MM-YYYY', true).startOf('day');
+        const adminEndCheck = moment(user.updatedBy.endDate, 'DD-MM-YYYY', true).endOf('day');
+        const now = moment();
+        if (adminStartCheck.isValid() && adminEndCheck.isValid()) {
+          if (now.isBefore(adminStartCheck) || now.isAfter(adminEndCheck)) {
+            continue;
+          }
+        }
+      }
+
       let classDetails = null;
       if (mongoose.Types.ObjectId.isValid(user.className)) {
         classDetails = (await School.findById(user.className)) || (await College.findById(user.className));
