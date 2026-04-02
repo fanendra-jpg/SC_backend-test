@@ -13,8 +13,6 @@ router.delete("/schooler/Categorydelete/:id", auth, SchoolercategoryController.d
 router.get("/schooler/category/exam-type/:id", auth,SchoolercategoryController.getExamTypeByCategoryId);
 
 
-
-
 router.post("/schooler/groupcreate", auth, SchoolercategoryController.createSchoolergroup);
 
 router.get("/schooler/allgroup", auth,SchoolercategoryController.getAllSchoolergroups);

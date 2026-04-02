@@ -2480,6 +2480,7 @@ exports.getGenrelIq = async (req, res) => {
       .populate('learning2')
       .populate('learning3')
       .populate('learning4')
+      .populate('learning5')
       .lean();
 
     for (const item of assignedList) {
@@ -2518,11 +2519,13 @@ exports.getGenrelIq = async (req, res) => {
       if (!item.learning2 || Object.keys(item.learning2).length === 0) item.learning2 = null;
       if (!item.learning3 || Object.keys(item.learning3).length === 0) item.learning3 = null;
       if (!item.learning4 || Object.keys(item.learning4).length === 0) item.learning4 = null;
+      if (!item.learning5 || Object.keys(item.learning5).length === 0) item.learning5 = null;
 
       item.learningAverage = await getIQScore('learning');
       item.learning2Average = await getIQScore('learning2');
       item.learning3Average = await getIQScore('learning3');
       item.learning4Average = await getIQScore('learning4');
+      item.learning5Average = await getIQScore('learning5');
     }
 
     return res.status(200).json({ data: assignedList });
@@ -2767,6 +2770,7 @@ exports.Dashboard = async (req, res) => {
         .populate('learning2')
         .populate('learning3')
         .populate('learning4')
+        .populate('learning5')
         .lean();
 
       for (const item of assignedLearnings) {
@@ -2791,6 +2795,7 @@ exports.Dashboard = async (req, res) => {
         item.learning2Average = await getIQ('learning2');
         item.learning3Average = await getIQ('learning3');
         item.learning4Average = await getIQ('learning4');
+        item.learning5Average = await getIQ('learning5');
       }
     }
 
@@ -2800,7 +2805,7 @@ exports.Dashboard = async (req, res) => {
     const totalQuiz = markingSetting?.totalquiz || 0;
 
     for (const item of assignedLearnings) {
-      ['learning', 'learning2', 'learning3', 'learning4'].forEach(field => {
+      ['learning', 'learning2', 'learning3', 'learning4', 'learning5'].forEach(field => {
         const l = item[field];
         if (l && l._id && !seen.has(l._id.toString())) {
           seen.add(l._id.toString());
@@ -2837,7 +2842,10 @@ exports.Dashboard = async (req, res) => {
       learning2Average: item.learning2Average,
       learning3: item.learning3 ? pick(item.learning3, ['_id', 'name']) : null,
       learning3Average: item.learning3Average,
+      learning4: item.learning4 ? pick(item.learning4, ['_id', 'name']) : null,
       learning4Average: item.learning4Average,
+      learning5: item.learning5 ? pick(item.learning5, ['_id', 'name']) : null,
+      learning5Average: item.learning5Average,
       startDate: item.startDate,
       endDate: item.endDate,
       classInfo: item.classInfo

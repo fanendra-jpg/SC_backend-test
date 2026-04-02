@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const auth = require('../middleware/auth');
 const userExamGroupController = require("../controllers/userexamgroupController")
+
 router.post("/Schooler/usergroupCreate", auth,userExamGroupController.createGroup);
 router.get("/Schooler/AlluserExamGroups", auth,userExamGroupController.AlluserExamGroups);
 router.put("/Schooler/updateGroup/:groupId", userExamGroupController.updateGroup);
