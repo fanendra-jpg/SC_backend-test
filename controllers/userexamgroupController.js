@@ -1020,7 +1020,17 @@ exports.getAllActiveUsers = async (req, res) => {
     const requestedIndex = category ? categoryIds.indexOf(category) : -1;
 
     // Fetch groups and their categories to properly exclude users ONLY from groups in the currently requested category
-    const groupedUsers = await UserExamGroup.find({}, "members category");
+    const groupedUsers = await UserExamGroup.find({}, "members category").populate("category", "_id name");
+    
+    // Build a map of user -> category for final mapping
+    const userGroupCategoryMap = {};
+    for (const g of groupedUsers) {
+      g.members.forEach(uid => {
+        if (!userGroupCategoryMap[uid.toString()]) {
+          userGroupCategoryMap[uid.toString()] = g.category;
+        }
+      });
+    }
     let relevantGroups = groupedUsers;
     if (category) {
        relevantGroups = groupedUsers.filter(g => g.category?.toString() === category);
@@ -1094,6 +1104,8 @@ exports.getAllActiveUsers = async (req, res) => {
         if (user.aadharCard && fs.existsSync(user.aadharCard)) user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
         if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
+        let userCategoryObj = userGroupCategoryMap[user._id.toString()] || { _id: allCategories[0]._id, name: allCategories[0].name };
+
         const formattedUser = {
           ...user.toObject(),
           country: user.countryId?.name || "",
@@ -1102,6 +1114,8 @@ exports.getAllActiveUsers = async (req, res) => {
           institutionName: user.schoolName || user.collegeName || user.instituteName || "",
           institutionType: user.studentType || "",
           updatedBy: user.updatedBy || null,
+          category: user.className ? userCategoryObj : null,
+          schoolershipstatus: (!user.schoolershipstatus || user.schoolershipstatus === "NA") ? "Participant" : user.schoolershipstatus,
         };
 
         if (classDetails && classDetails.price != null) formattedUser.classOrYear = classDetails.name;
@@ -1156,6 +1170,8 @@ exports.getAllActiveUsers = async (req, res) => {
       if (user.aadharCard && fs.existsSync(user.aadharCard)) user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
       if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
+      let userCategoryObj = userGroupCategoryMap[user._id.toString()] || { _id: allCategories[0]._id, name: allCategories[0].name };
+
       const formattedUser = {
         ...user.toObject(),
         country: user.countryId?.name || "",
@@ -1164,6 +1180,8 @@ exports.getAllActiveUsers = async (req, res) => {
         institutionName: user.schoolName || user.collegeName || user.instituteName || "",
         institutionType: user.studentType || "",
         updatedBy: user.updatedBy || null,
+        category: user.className ? userCategoryObj : null,
+        schoolershipstatus: (!user.schoolershipstatus || user.schoolershipstatus === "NA") ? "Participant" : user.schoolershipstatus,
       };
 
       if (classDetails && classDetails.price != null) formattedUser.classOrYear = classDetails.name;
