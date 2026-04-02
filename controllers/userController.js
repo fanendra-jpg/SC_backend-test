@@ -2408,8 +2408,51 @@ exports.userforAdmin = async (req, res) => {
         if (finalistMap[key]) computedSchoolershipstatus = "Finalist";
       }
 
-      // Compute sessionStatus the same way as superadmin route
-      const sessionStatus = (admin.status === true && user.paymentStatus === true);
+      let adminStatus = "N/A";
+      if (admin) {
+        adminStatus = admin.status;
+        if (!user.originalUserId && user.adminStatus !== admin.status) {
+          await User.updateOne(
+            { _id: user._id },
+            { $set: { adminStatus: admin.status } }
+          );
+          user.adminStatus = admin.status;
+        }
+
+        if (admin.startDate && admin.endDate) {
+          const adminStartCheck = moment(admin.startDate, 'DD-MM-YYYY', true).startOf('day');
+          const adminEndCheck = moment(admin.endDate, 'DD-MM-YYYY', true).endOf('day');
+
+          if (adminStartCheck.isValid() && adminEndCheck.isValid()) {
+            const userStartCheck = moment(user.startDate, 'DD-MM-YYYY', true);
+            const userEndCheck = moment(user.endDate, 'DD-MM-YYYY', true);
+
+            if (!userStartCheck.isSame(adminStartCheck, 'day') || !userEndCheck.isSame(adminEndCheck, 'day')) {
+              if (!user.originalUserId) {
+                await User.updateOne(
+                  { _id: user._id },
+                  { $set: { startDate: admin.startDate, endDate: admin.endDate } }
+                );
+              }
+              user.startDate = admin.startDate;
+              user.endDate = admin.endDate;
+            }
+          }
+        }
+      }
+
+      let sessionStatus = false;
+      if (user.adminStatus === true && user.paymentStatus === true) {
+        sessionStatus = true;
+      }
+
+      if (!user.originalUserId && user.sessionStatus !== sessionStatus) {
+        await User.updateOne(
+          { _id: user._id },
+          { $set: { sessionStatus: sessionStatus } }
+        );
+        user.sessionStatus = sessionStatus;
+      }
 
       let userObj = {
         _id: user._id,
@@ -2420,7 +2463,8 @@ exports.userforAdmin = async (req, res) => {
         email: user.email,
         VerifyEmail: user.VerifyEmail,
         status: user.status,
-        sessionStatus: sessionStatus,
+        adminStatus: adminStatus,
+        sessionStatus: user.sessionStatus ?? sessionStatus,
         aadharCard: user.aadharCard,
         pincode: user.pincode,
         className: user.className,
