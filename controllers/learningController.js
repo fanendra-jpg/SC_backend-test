@@ -2851,7 +2851,6 @@ exports.Dashboard = async (req, res) => {
       classInfo: item.classInfo
         ? pick(item.classInfo, ['_id', 'name'])
         : null,
-      learning4: null
     }));
 
     return res.status(200).json({
