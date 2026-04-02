@@ -87,7 +87,7 @@ exports.createGroup = async (req, res) => {
       members: memberIds,
       category,
       className,
-      createdBy, 
+      createdBy,
     });
 
     res.status(201).json({
@@ -140,7 +140,7 @@ exports.createGroup = async (req, res) => {
 
 //       const ExamAssignedCount = examsWithThisGroup.length;
 
-    
+
 //       // let AssignedGroupCount = 0;
 //       // for (let ex of examsWithThisGroup) {
 //       //   AssignedGroupCount += (ex.assignedGroup?.length || 0);
@@ -194,7 +194,7 @@ exports.AlluserExamGroups = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized. Invalid token." });
     }
 
-    let query = { createdBy }; 
+    let query = { createdBy };
 
     if (className && mongoose.Types.ObjectId.isValid(className)) {
       query.className = className;
@@ -387,7 +387,7 @@ exports.deleteGroup = async (req, res) => {
 //       });
 //     }
 
-   
+
 //     const previousExams = await Schoolerexam.find({
 //       assignedGroup: groupId,
 //       createdAt: { $lt: currentExam.createdAt },
@@ -422,7 +422,7 @@ exports.deleteGroup = async (req, res) => {
 //       );
 //     }
 
-    
+
 //     const group = await UserExamGroup.findById(groupId).populate(
 //       "members",
 //       "firstName middleName lastName status email category schoolershipstatus _id"
@@ -434,7 +434,7 @@ exports.deleteGroup = async (req, res) => {
 
 //     const memberIds = group.members.map(m => m._id);
 
-    
+
 //     const examStatuses = await ExamUserStatus.find({
 //       userId: { $in: memberIds },
 //       examId,
@@ -447,7 +447,7 @@ exports.deleteGroup = async (req, res) => {
 //       examStatusMap[es.userId.toString()] = es;
 //     });
 
-   
+
 //     const examResults = await ExamResult.find({
 //       userId: { $in: memberIds },
 //       examId,
@@ -460,11 +460,11 @@ exports.deleteGroup = async (req, res) => {
 //       examResultMap[er.userId.toString()] = er;
 //     });
 
-   
+
 //     const membersWithExamData = [];
 
 //     for (const member of group.members) {
-      
+
 //       if (eliminatedUserSet.has(member._id.toString())) continue;
 
 //       const es = examStatusMap[member._id.toString()];
@@ -479,7 +479,7 @@ exports.deleteGroup = async (req, res) => {
 //         status: member.status,
 //         category: member.category,
 
-      
+
 //         schoolershipstatus: member.schoolershipstatus ?? "NA",
 
 //         percentage: er?.percentage ?? null,
@@ -618,7 +618,7 @@ exports.getGroupMembers = async (req, res) => {
             );
 
             if (matchedExam) {
-              examStatusFromUser = matchedExam.status; 
+              examStatusFromUser = matchedExam.status;
               break;
             }
           }
@@ -667,9 +667,9 @@ exports.getGroupMembers = async (req, res) => {
 //     const { className, groupId, stateId, cityId, category } = req.query;
 //     const allowedCategoryId = "694234ab07da0be15f1f32f1";
 
-   
+
 //     if (category && category !== allowedCategoryId) {
-     
+
 //       let topUserFilter = { categoryId: category };
 //       if (className && mongoose.Types.ObjectId.isValid(className)) {
 //         topUserFilter.className = className;
@@ -904,7 +904,7 @@ exports.getGroupMembers = async (req, res) => {
 //       });
 //     }
 
-  
+
 //     let query = { status: "yes" };
 
 //     if (className && mongoose.Types.ObjectId.isValid(className)) {
@@ -919,13 +919,13 @@ exports.getGroupMembers = async (req, res) => {
 //       query.cityId = cityId;
 //     }
 
- 
+
 //     const groupedUsers = await UserExamGroup.find({}, "members");
 //     const allGroupedUserIds = groupedUsers.flatMap(g =>
 //       g.members.map(id => id.toString())
 //     );
 
-    
+
 //     let currentGroupMemberIds = [];
 //     if (groupId && mongoose.Types.ObjectId.isValid(groupId)) {
 //       const currentGroup = await UserExamGroup.findById(groupId).select("members");
@@ -934,7 +934,7 @@ exports.getGroupMembers = async (req, res) => {
 //       }
 //     }
 
-    
+
 //     const excludeIds = allGroupedUserIds.filter(
 //       id => !currentGroupMemberIds.includes(id)
 //     );
@@ -943,7 +943,7 @@ exports.getGroupMembers = async (req, res) => {
 //       query._id = { $nin: excludeIds };
 //     }
 
-    
+
 //     const users = await User.find(query)
 //       .populate("countryId", "name")
 //       .populate("stateId", "name")
@@ -987,7 +987,7 @@ exports.getGroupMembers = async (req, res) => {
 //         formattedUser.classOrYear = classDetails.name;
 //       }
 
-//       finalList.push(formattedUser);
+//      finalList.push(formattedUser);
 //     }
 
 //     return res.status(200).json({
@@ -1007,11 +1007,8 @@ exports.getAllActiveUsers = async (req, res) => {
   try {
     const { className, groupId, stateId, cityId, category } = req.query;
 
-    // Pre-fetch group exclusion data ONCE (used in both paths)
     const groupedUsers = await UserExamGroup.find({}, "members");
-    const allGroupedUserIds = groupedUsers.flatMap(g =>
-      g.members.map(id => id.toString())
-    );
+    const allGroupedUserIds = groupedUsers.flatMap(g => g.members.map(id => id.toString()));
 
     let currentGroupMemberIds = [];
     if (groupId && mongoose.Types.ObjectId.isValid(groupId)) {
@@ -1021,125 +1018,87 @@ exports.getAllActiveUsers = async (req, res) => {
       }
     }
 
-    // IDs that are in OTHER groups (not the current one being edited)
-    const excludeIds = allGroupedUserIds.filter(
-      id => !currentGroupMemberIds.includes(id)
-    );
+    const excludeIds = allGroupedUserIds.filter(id => !currentGroupMemberIds.includes(id));
 
-    // CATEGORY-BASED FLOW
     const allCategories = await Category.find({}).sort({ createdAt: 1 });
     const categoryIds = allCategories.map(c => c._id.toString());
     const requestedIndex = category ? categoryIds.indexOf(category) : -1;
 
     if (category && requestedIndex !== -1) {
-
-      let sourceCategoryId;
-      let sourceStage;
+      let query = { status: "yes" };
+      if (className && mongoose.Types.ObjectId.isValid(className)) query.className = className;
+      if (stateId && mongoose.Types.ObjectId.isValid(stateId)) query.stateId = stateId;
+      if (cityId && mongoose.Types.ObjectId.isValid(cityId)) query.cityId = cityId;
 
       if (requestedIndex === 0) {
-        // Bronze → Bronze Participants
-        sourceCategoryId = categoryIds[0];
-        sourceStage = "Participant";
-      } else {
-        // Silver → Bronze Finalists
-        // Gold   → Silver Finalists
-        sourceCategoryId = categoryIds[requestedIndex - 1];
-        sourceStage = "Finalist";
+        // Bronze → show users whose category is Bronze AND status is Participant
+        query["category._id"] = categoryIds[0];
+        query.schoolershipstatus = "Participant";
+        // Participants already in a group must NOT appear when creating a new group
+        if (excludeIds.length > 0) query._id = { $nin: excludeIds };
+
+      } else if (requestedIndex === 1) {
+        // Silver → show Bronze Finalists (promoted from Bronze)
+        query["category._id"] = categoryIds[0];
+        query.schoolershipstatus = "Finalist";
+        // Finalists are promoted — no group exclusion applied
+
+      } else if (requestedIndex === 2) {
+        // Gold → show Silver Finalists (promoted from Silver)
+        query["category._id"] = categoryIds[1];
+        query.schoolershipstatus = "Finalist";
+        // Finalists are promoted — no group exclusion applied
       }
 
-      let topUserFilter = {
-        categoryId: sourceCategoryId,
-        stage: sourceStage,
-      };
-
-      if (className && mongoose.Types.ObjectId.isValid(className)) {
-        topUserFilter.className = className;
-      }
-
-      // If fetching Participants, exclude already-grouped users at DB level
-      // Finalists are promoted users — they are allowed to appear in new groups
-      if (sourceStage === "Participant" && excludeIds.length > 0) {
-        topUserFilter.userId = { $nin: excludeIds };
-      }
-
-      const topUsers = await CategoryTopUser.find(topUserFilter)
+      const users = await User.find(query)
+        .populate("countryId", "name")
+        .populate("stateId", "name")
+        .populate("cityId", "name")
         .populate({
-          path: "userId",
-          match: { status: "yes" },
-          populate: [
-            { path: "countryId", select: "name" },
-            { path: "stateId", select: "name" },
-            { path: "cityId", select: "name" },
-            {
-              path: "updatedBy",
-              match: { status: "active" },
-              select: "email session startDate endDate endTime name role status",
-            },
-          ],
-        })
-        .populate("examId", "examName");
+          path: "updatedBy",
+          match: { status: "active" },
+          select: "email name role status",
+        });
 
       const baseUrl = `${req.protocol}://${req.get("host")}`.replace("http://", "https://");
-      let formattedUsers = [];
+      let finalList = [];
 
-      for (let record of topUsers) {
-        const user = record.userId;
-
-        // Skips if user status !== "yes" (populate match filtered out)
-        if (!user) continue;
-
-        // Skips if admin is not active (updatedBy filtered out by match)
+      for (let user of users) {
         if (!user.updatedBy) continue;
 
         let classDetails = null;
         if (mongoose.Types.ObjectId.isValid(user.className)) {
-          classDetails =
-            (await School.findById(user.className)) ||
-            (await College.findById(user.className));
+          classDetails = (await School.findById(user.className)) || (await College.findById(user.className));
         }
 
-        if (user.aadharCard && fs.existsSync(user.aadharCard)) {
-          user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
-        }
-        if (user.marksheet && fs.existsSync(user.marksheet)) {
-          user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
-        }
+        if (user.aadharCard && fs.existsSync(user.aadharCard)) user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
+        if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
         const formattedUser = {
           ...user._doc,
-          percentage: record.percentage,
-          rank: record.rank,
-          exam: record.examId?.examName || "",
-          stage: record.stage,
           country: user.countryId?.name || "",
           state: user.stateId?.name || "",
           city: user.cityId?.name || "",
-          institutionName:
-            user.schoolName || user.collegeName || user.instituteName || "",
+          institutionName: user.schoolName || user.collegeName || user.instituteName || "",
           institutionType: user.studentType || "",
           updatedBy: user.updatedBy || null,
         };
 
-        if (classDetails && classDetails.price != null) {
-          formattedUser.classOrYear = classDetails.name;
-        }
-
-        formattedUsers.push(formattedUser);
+        if (classDetails && classDetails.price != null) formattedUser.classOrYear = classDetails.name;
+        finalList.push(formattedUser);
       }
 
       return res.status(200).json({
         message: `Users fetched for ${allCategories[requestedIndex]?.name || category}.`,
-        users: formattedUsers,
+        users: finalList,
       });
     }
 
-    // DEFAULT: No category — fetch all active users
+    // DEFAULT: No category query param — fetch all active users (no category filter)
     let query = { status: "yes" };
-
     if (className && mongoose.Types.ObjectId.isValid(className)) query.className = className;
     if (stateId && mongoose.Types.ObjectId.isValid(stateId)) query.stateId = stateId;
     if (cityId && mongoose.Types.ObjectId.isValid(cityId)) query.cityId = cityId;
-
     if (excludeIds.length > 0) query._id = { $nin: excludeIds };
 
     const users = await User.find(query)
@@ -1149,7 +1108,7 @@ exports.getAllActiveUsers = async (req, res) => {
       .populate({
         path: "updatedBy",
         match: { status: "active" },
-        select: "email session startDate endDate endTime name role status",
+        select: "email name role status",
       });
 
     const baseUrl = `${req.protocol}://${req.get("host")}`.replace("http://", "https://");
@@ -1157,43 +1116,28 @@ exports.getAllActiveUsers = async (req, res) => {
 
     for (let user of users) {
       if (!user.updatedBy) continue;
-
       let classDetails = null;
       if (mongoose.Types.ObjectId.isValid(user.className)) {
-        classDetails =
-          (await School.findById(user.className)) ||
-          (await College.findById(user.className));
+        classDetails = (await School.findById(user.className)) || (await College.findById(user.className));
       }
-
-      if (user.aadharCard && fs.existsSync(user.aadharCard)) {
-        user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
-      }
-      if (user.marksheet && fs.existsSync(user.marksheet)) {
-        user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
-      }
+      if (user.aadharCard && fs.existsSync(user.aadharCard)) user.aadharCard = `${baseUrl}/uploads/${path.basename(user.aadharCard)}`;
+      if (user.marksheet && fs.existsSync(user.marksheet)) user.marksheet = `${baseUrl}/uploads/${path.basename(user.marksheet)}`;
 
       const formattedUser = {
         ...user._doc,
         country: user.countryId?.name || "",
         state: user.stateId?.name || "",
         city: user.cityId?.name || "",
-        institutionName:
-          user.schoolName || user.collegeName || user.instituteName || "",
+        institutionName: user.schoolName || user.collegeName || user.instituteName || "",
         institutionType: user.studentType || "",
         updatedBy: user.updatedBy || null,
       };
 
-      if (classDetails && classDetails.price != null) {
-        formattedUser.classOrYear = classDetails.name;
-      }
-
+      if (classDetails && classDetails.price != null) formattedUser.classOrYear = classDetails.name;
       finalList.push(formattedUser);
     }
 
-    return res.status(200).json({
-      message: "Active users fetched successfully.",
-      users: finalList,
-    });
+    return res.status(200).json({ message: "Active users fetched successfully.", users: finalList });
 
   } catch (error) {
     console.error("Get Users Error:", error);
@@ -1272,7 +1216,7 @@ exports.getUserCitiesByState = async (req, res) => {
     const groupedUsers = await UserExamGroup.find({}, "members");
     const allGroupedUserIds = groupedUsers.flatMap(g => g.members.map(id => id.toString()));
 
-    
+
     let currentGroupMemberIds = [];
     if (groupId && mongoose.Types.ObjectId.isValid(groupId)) {
       const currentGroup = await UserExamGroup.findById(groupId).select("members");
@@ -1281,13 +1225,13 @@ exports.getUserCitiesByState = async (req, res) => {
       }
     }
 
-    
+
     const excludeIds = allGroupedUserIds.filter(id => !currentGroupMemberIds.includes(id));
     if (excludeIds.length > 0) {
       query._id = { $nin: excludeIds };
     }
 
-   
+
     const users = await User.find(query).select("cityId").populate("cityId", "name");
 
 
