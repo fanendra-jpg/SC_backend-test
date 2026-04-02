@@ -1056,7 +1056,7 @@ exports.getAllActiveUsers = async (req, res) => {
         .populate("cityId", "name")
         .populate({
           path: "updatedBy",
-          match: { status: "active" },
+          match: { status: true },
           select: "email name role status",
         });
 
@@ -1107,7 +1107,7 @@ exports.getAllActiveUsers = async (req, res) => {
       .populate("cityId", "name")
       .populate({
         path: "updatedBy",
-        match: { status: "active" },
+        match: { status: true },
         select: "email name role status",
       });
 
